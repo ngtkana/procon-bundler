@@ -1,7 +1,5 @@
-mod make;
-mod remove;
+mod bundle;
 mod resolve;
-mod wrap;
 
 use clap::{App, Arg};
 use std::{fs, io::prelude::*, path};
@@ -17,16 +15,6 @@ fn cat(path: &path::Path) -> String {
         )
     });
     s
-}
-
-fn bundle(path: &path::Path) {
-    let cargo_toml_content = cat(&path.join("Cargo.toml"));
-    let make::Made { name, deps } = make::make(&cargo_toml_content);
-
-    let lib_content = cat(&path.join("src/lib.rs"));
-    let removed = remove::remove(&lib_content, &deps);
-    let wrapped = wrap::wrap(&removed, &name);
-    println!("{}", wrapped);
 }
 
 fn main() {
@@ -76,5 +64,5 @@ fn main() {
         })
         .expect("path か name くらいは指定していただきたいものです。");
 
-    bundle(&crate_path);
+    bundle::bundle(&crate_path);
 }
