@@ -1,12 +1,13 @@
 use regex::Regex;
 use std::{convert, path};
 
-mod data_structures;
-use data_structures as ds;
+use super::data_structures as ds;
 
-pub(super) fn modules(path: &path::Path) {
-    let modules = extract(&super::cat(&path.join("src/lib.rs")));
+pub(super) fn modules(path: &path::Path) -> Vec<ds::Module> {
+    extract(&super::cat(&path.join("src/lib.rs")))
+}
 
+pub(super) fn print(modules: &[ds::Module]) {
     modules.iter().for_each(|module| {
         println!(
             "vis:{}, name:{} ({})",

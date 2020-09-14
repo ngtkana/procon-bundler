@@ -1,4 +1,5 @@
 mod bundle;
+mod data_structures;
 mod modules;
 mod resolve;
 
@@ -74,7 +75,8 @@ fn main() {
         .expect("path か name くらいは指定していただきたいものです。");
 
     if matches.is_present("modules") {
-        modules::modules(&crate_path);
+        let modules_res = modules::modules(&crate_path);
+        modules::print(&modules_res);
     } else {
         bundle::bundle(&crate_path);
     }
