@@ -1,4 +1,5 @@
 mod bundle;
+mod modules;
 mod resolve;
 
 use clap::{App, Arg};
@@ -49,6 +50,14 @@ fn main() {
                 .required(false)
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("modules")
+                .short("m")
+                .long("modules")
+                .help("モジュールツリーを作ります。")
+                .required(false)
+                .takes_value(false),
+        )
         .get_matches();
 
     let crate_path = matches
@@ -64,5 +73,9 @@ fn main() {
         })
         .expect("path か name くらいは指定していただきたいものです。");
 
-    bundle::bundle(&crate_path);
+    if matches.is_present("modules") {
+        modules::modules(&crate_path);
+    } else {
+        bundle::bundle(&crate_path);
+    }
 }
