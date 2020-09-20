@@ -58,6 +58,9 @@ fn expand(lines: &mut Vec<String>, crate_root: &path::Path, name: &str) {
         })
     }
 
+    // まずはルートモジュールのぷりプロセスです。
+    preprocess(lines);
+
     *lines = lines
         .iter()
         .map(|line| match external(line) {
@@ -72,7 +75,9 @@ fn expand(lines: &mut Vec<String>, crate_root: &path::Path, name: &str) {
                     .collect::<Vec<String>>();
 
                 // サブモジュールのプリプロセスです。
-                preprocess(&mut sublines, module.vis, &module.name.0);
+                preprocess(&mut sublines);
+                // サブモジュールのポストプロセスです。
+                postprocess(&mut sublines, module.vis, &module.name.0);
                 remove_trailing_empty_lines(&mut sublines);
                 sublines
             }
@@ -81,18 +86,22 @@ fn expand(lines: &mut Vec<String>, crate_root: &path::Path, name: &str) {
         .flatten()
         .collect::<Vec<String>>();
 
-    // 最後にルートモジュールのプリプロセスです。
-    preprocess(lines, ds::Vis(String::new()), name);
+    // 最後にルートモジュールのポストプロセスです。
+    postprocess(lines, ds::Vis(String::new()), name);
 }
 
 // -- 展開前に適用するもの
 
-fn preprocess(lines: &mut Vec<String>, vis: ds::Vis, name: &str) {
-    // 最後の空行を消します。
-    remove_trailing_empty_lines(lines);
-
+fn preprocess(lines: &mut Vec<String>) {
     // テストモジュールを消します。
     remove_test_modules(lines);
+}
+
+// -- 展開後に適用するもの
+
+fn postprocess(lines: &mut Vec<String>, vis: ds::Vis, name: &str) {
+    // 最後の空行を消します。
+    remove_trailing_empty_lines(lines);
 
     // mod name { } をつけます。
     mod_block(lines, vis, name);
