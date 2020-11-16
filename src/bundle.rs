@@ -129,7 +129,7 @@ fn mod_block(lines: &mut Vec<String>, vis: ds::Vis, name: &str) {
 }
 fn remove_test_modules(lines: &mut Vec<String>) {
     fn is_cfg_test(line: &str) -> bool {
-        Regex::new(r"^#\[cfg\(test\)\]").unwrap().is_match(line)
+        line.starts_with("#[cfg(test)]")
     }
     fn is_start(line: &str) -> bool {
         Regex::new(r"mod\s*[a-z|A-Z][a-z|A-Z|0-9|_]*\s*\{")
@@ -137,7 +137,7 @@ fn remove_test_modules(lines: &mut Vec<String>) {
             .is_match(line)
     }
     fn is_end(line: &str) -> bool {
-        Regex::new(r"^\}").unwrap().is_match(line)
+        line.starts_with('}')
     }
     while let Some(start) = (0..lines.len() - 1)
         .find(|&start| is_cfg_test(&lines[start]) && is_start(&lines[start + 1]))

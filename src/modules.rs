@@ -54,7 +54,7 @@ fn extract(content: &str) -> Vec<ds::Module> {
 
     content
         .split('\n')
-        .map(|s| inline(s).or(external(s)))
+        .map(|s| inline(s).or_else(|| external(s)))
         .filter_map(convert::identity)
         .collect::<Vec<ds::Module>>()
 }
