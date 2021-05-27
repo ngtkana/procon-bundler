@@ -21,33 +21,13 @@ impl Resolve for FsResolver {
     }
 }
 
-#[allow(unused_macros)]
-macro_rules! manual_resolver {
-    (enum $resolver_name:ident {
-        $($path:expr => $content:expr),* $(,)?
-    }) => {
-        enum $resolver_name {}
-        impl $crate::resolver::Resolve for $resolver_name {
-            type B = ::std::io::BufReader<&'static [u8]>;
-            fn resolve(path: &str) -> Self::B {
-                ::std::io::BufReader::new(
-                    match path {
-                        $(
-                            $path => $content,
-                        )*
-                        _ => unreachable!(),
-                    }
-                    .as_bytes(),
-                )
-            }
-        }
-    };
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{FsResolver, Resolve};
-    use std::io::Read;
+    use {
+        super::{FsResolver, Resolve},
+        crate::manual_resolver,
+        std::io::Read,
+    };
 
     #[test]
     fn test_manual_resolver() {
