@@ -1,14 +1,19 @@
 mod bundle_crate;
 mod config_toml;
+mod fmt;
 mod resolver;
 mod types;
 
 pub use {
     bundle_crate::bundle_crate,
     config_toml::ConfigToml,
+    fmt::CrateWriter,
     resolver::{CrateResolver, Resolve},
     types::{Module, Span},
 };
+
+const TAB: &str = "    ";
+const TAB_LENGTH: usize = TAB.len();
 
 #[allow(unused_macros)]
 #[macro_export]

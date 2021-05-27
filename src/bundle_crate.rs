@@ -3,7 +3,7 @@ use std::mem::take;
 mod parse_line;
 
 use {
-    crate::{ConfigToml, Module, Resolve, Span},
+    crate::{ConfigToml, Module, Resolve, Span, TAB_LENGTH},
     parse_line::{
         parse_block_doc_comments_end, parse_block_doc_comments_start, parse_block_end,
         parse_cfg_test, parse_module_block_begin, parse_module_decl, parse_oneline_doc_comments,
@@ -13,8 +13,6 @@ use {
         path::{Path, PathBuf},
     },
 };
-
-const TAB_LENGTH: usize = 4;
 
 pub fn bundle_crate<R: Resolve>(resolver: R, config_toml: ConfigToml) -> Module {
     CrateBundler::new(resolver, config_toml).bundle_crate()
