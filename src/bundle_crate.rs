@@ -1,9 +1,11 @@
+use std::mem::take;
+
 mod parse_line;
 
 use {
     super::Resolve,
     crate::ConfigToml,
-    parse_line::{parse_block_end, parse_module_block_begin, parse_module_decl},
+    parse_line::{parse_block_end, parse_cfg_test, parse_module_block_begin, parse_module_decl},
     std::{
         io::BufRead,
         path::{Path, PathBuf},
@@ -37,6 +39,8 @@ impl<R: Resolve> CrateBundler<R> {
         // 結果がモジュール別に格納されるスタック
         // （関数終了時には、要素数 1 になっているべきです。）
         let mut stack = vec![Module::new(current_module_path.clone())];
+        // 未解決 #[cfg(test)] フラグ
+        let mut unresolved_test = false;
 
         for line in reader.lines().map(|line| {
             line.unwrap_or_else(|e| {
@@ -59,25 +63,31 @@ impl<R: Resolve> CrateBundler<R> {
                 //
                 // * モジュールパスを変更して再帰呼出し
                 // * モジュールパスを戻す
+                // * テストフラグが立っていればモジュールに反映
                 //
                 current_module_path.push(name);
+                let mut module = self.bundle_module(
+                    self.resolver.resolve(&current_module_path),
+                    current_module_path.clone(),
+                );
+                module.is_test = take(&mut unresolved_test);
                 stack
                     .last_mut()
                     .unwrap()
                     .spans
-                    .push(Span::Module(Box::new(self.bundle_module(
-                        self.resolver.resolve(&current_module_path),
-                        current_module_path.clone(),
-                    ))));
+                    .push(Span::Module(Box::new(module)));
                 current_module_path.pop();
             } else if let Some(name) = parse_module_block_begin(&line) {
                 // Case 2: インラインモジュールの開始
                 //
                 // * モジュールパスを変更
                 // * スタックに新しいモジュールを積む
+                // * テストフラグが立っていればモジュールに反映
                 //
                 current_module_path.push(name);
-                stack.push(Module::new(current_module_path.clone()));
+                let mut module = Module::new(current_module_path.clone());
+                module.is_test = take(&mut unresolved_test);
+                stack.push(module);
             } else if let Some(space_count) = parse_block_end(&line) {
                 if 2 <= stack.len() && space_count == (stack.len() - 2) * TAB_LENGTH {
                     // Case 3: インラインモジュールの終了
@@ -95,6 +105,12 @@ impl<R: Resolve> CrateBundler<R> {
                 } else {
                     needs_current_line = true;
                 }
+            } else if parse_cfg_test(&line) {
+                // Case 4: #[cfg(test)]
+                //
+                // * テストフラグを立てます。
+                //
+                unresolved_test = true;
             } else {
                 needs_current_line = true;
             }
@@ -150,12 +166,14 @@ fn remove_indentation(line: &str, indent_level: usize) -> String {
 pub struct Module {
     path: PathBuf,
     spans: Vec<Span>,
+    is_test: bool,
 }
 impl Module {
     fn new(path: PathBuf) -> Self {
         Self {
             path,
             spans: Vec::new(),
+            is_test: false,
         }
     }
 }
@@ -185,6 +203,7 @@ mod tests {
         }
         let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
+            is_test: false,
             path: PathBuf::from("."),
             spans: vec![Span::Lines(vec!["hi,".to_owned(), "hello!".to_owned()])],
         };
@@ -192,7 +211,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bundle_one_child_module() {
+    fn test_simple_external_module() {
         manual_resolver! {
             struct ManualResolver {
                 "." => concat!(
@@ -208,10 +227,12 @@ mod tests {
         }
         let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
+            is_test: false,
             path: PathBuf::from("."),
             spans: vec![
                 Span::Lines(vec!["hi,".to_owned()]),
                 Span::Module(Box::new(Module {
+                    is_test: false,
                     path: PathBuf::from("./a"),
                     spans: vec![Span::Lines(vec![
                         "a also says: hi,".to_owned(),
@@ -225,7 +246,43 @@ mod tests {
     }
 
     #[test]
-    fn test_bundle_one_inline_module() {
+    fn test_test_external_module() {
+        manual_resolver! {
+            struct ManualResolver {
+                "." => concat!(
+                    "hi,\n",
+                    "#[cfg(test)]\n",
+                    "mod a;\n",
+                    "hello!\n",
+                ),
+                "./a" => concat!(
+                    "a also says: hi,\n",
+                    "a also says: hello!\n",
+                ),
+            }
+        }
+        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let expected = Module {
+            is_test: false,
+            path: PathBuf::from("."),
+            spans: vec![
+                Span::Lines(vec!["hi,".to_owned()]),
+                Span::Module(Box::new(Module {
+                    is_test: true,
+                    path: PathBuf::from("./a"),
+                    spans: vec![Span::Lines(vec![
+                        "a also says: hi,".to_owned(),
+                        "a also says: hello!".to_owned(),
+                    ])],
+                })),
+                Span::Lines(vec!["hello!".to_owned()]),
+            ],
+        };
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_inline_module() {
         manual_resolver! {
             struct ManualResolver {
                 "." => concat!(
@@ -241,10 +298,49 @@ mod tests {
         }
         let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
+            is_test: false,
             path: PathBuf::from("."),
             spans: vec![
                 Span::Lines(vec!["hi,".to_owned()]),
                 Span::Module(Box::new(Module {
+                    is_test: false,
+                    path: PathBuf::from("./a"),
+                    spans: vec![Span::Lines(vec![
+                        "hey".to_owned(),
+                        "shallow".to_owned(),
+                        " deep".to_owned(),
+                    ])],
+                })),
+                Span::Lines(vec!["hello!".to_owned()]),
+            ],
+        };
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_test_inline_module() {
+        manual_resolver! {
+            struct ManualResolver {
+                "." => concat!(
+                    "hi,\n",
+                    "#[cfg(test)]\n",
+                    "mod a {\n",
+                    "    hey\n",
+                    "   shallow\n",
+                    "     deep\n",
+                    "}\n",
+                    "hello!\n",
+                ),
+            }
+        }
+        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let expected = Module {
+            is_test: false,
+            path: PathBuf::from("."),
+            spans: vec![
+                Span::Lines(vec!["hi,".to_owned()]),
+                Span::Module(Box::new(Module {
+                    is_test: true,
                     path: PathBuf::from("./a"),
                     spans: vec![Span::Lines(vec![
                         "hey".to_owned(),
@@ -286,22 +382,27 @@ mod tests {
         }
         let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
+            is_test: false,
             path: PathBuf::from("."),
             spans: vec![
                 Span::Lines(vec!["begin .".to_owned()]),
                 Span::Module(Box::new(Module {
+                    is_test: false,
                     path: PathBuf::from("./a"),
                     spans: vec![
                         Span::Lines(vec!["begin a".to_owned()]),
                         Span::Module(Box::new(Module {
+                            is_test: false,
                             path: PathBuf::from("./a/b"),
                             spans: vec![
                                 Span::Lines(vec!["begin b".to_owned()]),
                                 Span::Module(Box::new(Module {
+                                    is_test: false,
                                     path: PathBuf::from("./a/b/c"),
                                     spans: vec![
                                         Span::Lines(vec!["begin c".to_owned()]),
                                         Span::Module(Box::new(Module {
+                                            is_test: false,
                                             path: PathBuf::from("./a/b/c/d"),
                                             spans: vec![Span::Lines(vec![
                                                 "begin d".to_owned(),
@@ -355,22 +456,27 @@ mod tests {
         }
         let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
+            is_test: false,
             path: PathBuf::from("."),
             spans: vec![
                 Span::Lines(vec!["begin .".to_owned()]),
                 Span::Module(Box::new(Module {
+                    is_test: false,
                     path: PathBuf::from("./a"),
                     spans: vec![
                         Span::Lines(vec!["begin a".to_owned()]),
                         Span::Module(Box::new(Module {
+                            is_test: false,
                             path: PathBuf::from("./a/b"),
                             spans: vec![
                                 Span::Lines(vec!["begin b".to_owned()]),
                                 Span::Module(Box::new(Module {
+                                    is_test: false,
                                     path: PathBuf::from("./a/b/c"),
                                     spans: vec![
                                         Span::Lines(vec!["begin c".to_owned()]),
                                         Span::Module(Box::new(Module {
+                                            is_test: false,
                                             path: PathBuf::from("./a/b/c/d"),
                                             spans: vec![Span::Lines(vec![
                                                 "begin d".to_owned(),
@@ -422,10 +528,12 @@ mod tests {
         }
         let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
+            is_test: false,
             path: PathBuf::from("."),
             spans: vec![
                 Span::Lines(vec!["begin .".to_owned()]),
                 Span::Module(Box::new(Module {
+                    is_test: false,
                     path: PathBuf::from("./a"),
                     spans: vec![Span::Lines(vec!["begin a".to_owned(), "end a".to_owned()])],
                 })),
@@ -435,6 +543,7 @@ mod tests {
                     "between a and b".to_owned(),
                 ]),
                 Span::Module(Box::new(Module {
+                    is_test: false,
                     path: PathBuf::from("./b"),
                     spans: vec![Span::Lines(vec!["begin b".to_owned(), "end b".to_owned()])],
                 })),
@@ -444,6 +553,7 @@ mod tests {
                     "between b and c".to_owned(),
                 ]),
                 Span::Module(Box::new(Module {
+                    is_test: false,
                     path: PathBuf::from("./c"),
                     spans: vec![Span::Lines(vec!["begin c".to_owned(), "end c".to_owned()])],
                 })),
@@ -485,14 +595,19 @@ mod tests {
         }
         let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
+            is_test: false,
             path: PathBuf::from("."),
             spans: vec![Span::Module(Box::new(Module {
+                is_test: false,
                 path: PathBuf::from("./a"),
                 spans: vec![Span::Module(Box::new(Module {
+                    is_test: false,
                     path: PathBuf::from("./a/b"),
                     spans: vec![Span::Module(Box::new(Module {
+                        is_test: false,
                         path: PathBuf::from("./a/b/c"),
                         spans: vec![Span::Module(Box::new(Module {
+                            is_test: false,
                             path: PathBuf::from("./a/b/c/d"),
                             spans: vec![
                                 Span::Lines(vec![
@@ -501,8 +616,10 @@ mod tests {
                                     "before e".to_owned(),
                                 ]),
                                 Span::Module(Box::new(Module {
+                                    is_test: false,
                                     path: PathBuf::from("./a/b/c/d/e"),
                                     spans: vec![Span::Module(Box::new(Module {
+                                        is_test: false,
                                         path: PathBuf::from("./a/b/c/d/e/f"),
                                         spans: vec![Span::Lines(vec!["in f".to_owned()])],
                                     }))],
@@ -513,6 +630,7 @@ mod tests {
                                     "between e and g".to_owned(),
                                 ]),
                                 Span::Module(Box::new(Module {
+                                    is_test: false,
                                     path: PathBuf::from("./a/b/c/d/g"),
                                     spans: vec![Span::Lines(vec!["in g".to_owned()])],
                                 })),

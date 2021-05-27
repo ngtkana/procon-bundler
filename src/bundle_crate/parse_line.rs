@@ -44,10 +44,18 @@ pub fn parse_block_end(line: &str) -> Option<usize> {
     RE.captures(line).map(|captures| captures[1].len())
 }
 
+// #[cfg(test)] であるかどうかを判定します。
+pub fn parse_cfg_test(line: &str) -> bool {
+    lazy_static! {
+        static ref RE: Regex = Regex::new(r#"\s*#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*"#).unwrap();
+    }
+    RE.is_match(line)
+}
+
 #[cfg(test)]
 mod tests {
     use {
-        super::{parse_block_end, parse_module_block_begin, parse_module_decl},
+        super::{parse_block_end, parse_cfg_test, parse_module_block_begin, parse_module_decl},
         test_case::test_case,
     };
 
@@ -78,5 +86,11 @@ mod tests {
     #[test_case("   }   " => Some(3); "block end with leading and trailing spaces")]
     fn test_parse_block_end(line: &str) -> Option<usize> {
         parse_block_end(line)
+    }
+
+    #[test_case("#[cfg(test)]" => true; "simple cfg(test)")]
+    #[test_case("#  [  cfg  (  test  )  ]  " => true; "cfg(test) with may spaces")]
+    fn test_parse_cfg_test(line: &str) -> bool {
+        parse_cfg_test(line)
     }
 }
