@@ -1,6 +1,10 @@
+mod config_toml;
 mod resolver;
 
-pub use resolver::{FsResolver, Resolve};
+pub use {
+    config_toml::ConfigToml,
+    resolver::{FsResolver, Resolve},
+};
 
 #[allow(unused_macros)]
 #[macro_export]
