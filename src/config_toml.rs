@@ -3,6 +3,7 @@ use {
     toml::{from_str, Value},
 };
 
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ConfigToml {
     pub deps: HashMap<String, PathBuf>,
 }

@@ -1,7 +1,9 @@
+mod bundle_crate;
 mod config_toml;
 mod resolver;
 
 pub use {
+    bundle_crate::{bundle_crate, Module, Span},
     config_toml::ConfigToml,
     resolver::{CrateResolver, Resolve},
 };
@@ -21,7 +23,7 @@ macro_rules! manual_resolver {
                         $(
                             $module_path => $content,
                         )*
-                        _ => unreachable!(),
+                        _ => panic!("Received an illegal module path `{:?}`", module_path),
                     }
                     .as_bytes(),
                 )
