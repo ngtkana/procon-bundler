@@ -1,11 +1,13 @@
 mod bundle_crate;
 mod config_toml;
 mod resolver;
+mod types;
 
 pub use {
-    bundle_crate::{bundle_crate, Module, Span},
+    bundle_crate::bundle_crate,
     config_toml::ConfigToml,
     resolver::{CrateResolver, Resolve},
+    types::{Module, Span},
 };
 
 #[allow(unused_macros)]

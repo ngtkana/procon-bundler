@@ -3,8 +3,7 @@ use std::mem::take;
 mod parse_line;
 
 use {
-    super::Resolve,
-    crate::ConfigToml,
+    crate::{ConfigToml, Module, Resolve, Span},
     parse_line::{
         parse_block_doc_comments_end, parse_block_doc_comments_start, parse_block_end,
         parse_cfg_test, parse_module_block_begin, parse_module_decl, parse_oneline_doc_comments,
@@ -177,27 +176,6 @@ fn remove_indentation(line: &str, indent_level: usize) -> String {
         chars.next();
     }
     chars.collect::<String>()
-}
-
-#[derive(Clone, Debug, Default, Hash, PartialEq)]
-pub struct Module {
-    path: PathBuf,
-    spans: Vec<Span>,
-    is_test: bool,
-}
-impl Module {
-    fn new(path: PathBuf) -> Self {
-        Self {
-            path,
-            spans: Vec::new(),
-            is_test: false,
-        }
-    }
-}
-#[derive(Clone, Debug, Hash, PartialEq)]
-pub enum Span {
-    Lines(Vec<String>),
-    Module(Box<Module>),
 }
 
 #[cfg(test)]
