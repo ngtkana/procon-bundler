@@ -1,1 +1,3 @@
+mod resolver;
+
 fn main() {}
