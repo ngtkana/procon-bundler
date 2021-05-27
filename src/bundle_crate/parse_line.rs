@@ -52,10 +52,29 @@ pub fn parse_cfg_test(line: &str) -> bool {
     RE.is_match(line)
 }
 
+// oneline doc_comments であるかを判定します。
+pub fn parse_oneline_doc_comments(line: &str) -> bool {
+    line.trim().starts_with("///") || line.trim().starts_with("//!")
+}
+
+// block doc_comments の開始であるかを判定します。
+pub fn parse_block_doc_comments_start(line: &str) -> bool {
+    line.trim().starts_with("/*!") || line.trim().starts_with("/**")
+}
+
+// block doc_comments の終了であるかを判定します。
+pub fn parse_block_doc_comments_end(line: &str) -> bool {
+    line.trim().ends_with("*/")
+}
+
 #[cfg(test)]
 mod tests {
     use {
-        super::{parse_block_end, parse_cfg_test, parse_module_block_begin, parse_module_decl},
+        super::{
+            parse_block_doc_comments_end, parse_block_doc_comments_start, parse_block_end,
+            parse_cfg_test, parse_module_block_begin, parse_module_decl,
+            parse_oneline_doc_comments,
+        },
         test_case::test_case,
     };
 
@@ -92,5 +111,24 @@ mod tests {
     #[test_case("#  [  cfg  (  test  )  ]  " => true; "cfg(test) with may spaces")]
     fn test_parse_cfg_test(line: &str) -> bool {
         parse_cfg_test(line)
+    }
+
+    #[test_case("/// hi" => true; "outer doc comments")]
+    #[test_case("//! hi" => true; "inner doc comments")]
+    #[test_case("    /// hi" => true; "outer doc comments with leading spaces")]
+    #[test_case("    //! hi" => true; "inner doc comments with leading spaces")]
+    fn test_parse_oneline_doc_comments(line: &str) -> bool {
+        parse_oneline_doc_comments(line)
+    }
+
+    #[test_case("    /** hi    " => true; "outer block doc comments start")]
+    #[test_case("    /*! hi    " => true; "inner block doc comments start")]
+    fn test_parse_block_doc_comments_start(line: &str) -> bool {
+        parse_block_doc_comments_start(line)
+    }
+
+    #[test_case("    hi **/    " => true; "block doc comments end")]
+    fn test_parse_block_doc_comments_end(line: &str) -> bool {
+        parse_block_doc_comments_end(line)
     }
 }

@@ -5,7 +5,10 @@ mod parse_line;
 use {
     super::Resolve,
     crate::ConfigToml,
-    parse_line::{parse_block_end, parse_cfg_test, parse_module_block_begin, parse_module_decl},
+    parse_line::{
+        parse_block_doc_comments_end, parse_block_doc_comments_start, parse_block_end,
+        parse_cfg_test, parse_module_block_begin, parse_module_decl, parse_oneline_doc_comments,
+    },
     std::{
         io::BufRead,
         path::{Path, PathBuf},
@@ -41,6 +44,8 @@ impl<R: Resolve> CrateBundler<R> {
         let mut stack = vec![Module::new(current_module_path.clone())];
         // 未解決 #[cfg(test)] フラグ
         let mut unresolved_test = false;
+        // doc comments 内フラグ
+        let mut in_doc_comments = false;
 
         for line in reader.lines().map(|line| {
             line.unwrap_or_else(|e| {
@@ -58,7 +63,14 @@ impl<R: Resolve> CrateBundler<R> {
             // どの `Case \d` にも合致しないときには、
             // `needs_current_line` フラグが立つので、
             // 直後に回収します。
-            if let Some(name) = parse_module_decl(&line) {
+            if in_doc_comments {
+                // Case 0: ブロック doc comments の終了
+                // NOTE: `*/` は通常のブロックコメントの終了にも使われるので、
+                // フラグをチェックしています。
+                if parse_block_doc_comments_end(&line) {
+                    in_doc_comments = false;
+                }
+            } else if let Some(name) = parse_module_decl(&line) {
                 // Case 1: モジュール宣言
                 //
                 // * モジュールパスを変更して再帰呼出し
@@ -107,10 +119,15 @@ impl<R: Resolve> CrateBundler<R> {
                 }
             } else if parse_cfg_test(&line) {
                 // Case 4: #[cfg(test)]
-                //
-                // * テストフラグを立てます。
-                //
                 unresolved_test = true;
+            } else if parse_block_doc_comments_start(&line) {
+                // Case 5: ブロック doc comments の開始
+                assert_eq!(in_doc_comments, false);
+                in_doc_comments = true;
+            } else if parse_oneline_doc_comments(&line) || line.is_empty() {
+                // Case 6: oneline doc comments or 空行
+                //
+                // * なにもしません
             } else {
                 needs_current_line = true;
             }
@@ -206,6 +223,54 @@ mod tests {
             is_test: false,
             path: PathBuf::from("."),
             spans: vec![Span::Lines(vec!["hi,".to_owned(), "hello!".to_owned()])],
+        };
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_skip_doc_comments_and_empty_line() {
+        manual_resolver! {
+            struct ManualResolver {
+                "." => concat!(
+                    "/*!\n",
+                    "    comments\n",
+                    "    comments\n",
+                    "*/\n",
+                    "start\n",
+                    "\n",
+                    "/* block comments */\n", // 普通のコメントは消えません。
+                    "// line comments\n",     // 普通のコメントは消えません。
+                    "start\n",
+                    "/// doc comments\n",
+                    "    /// doc comments with inentation\n",
+                    "/// doc comments\n",
+                    "\n",
+                    "contents\n",
+                    "/**\n",
+                    "    comments\n",
+                    "    comments\n",
+                    "*/\n",
+                    "contents\n",
+                    "end\n",
+                    "end\n",
+                    "\n",
+                ),
+            }
+        }
+        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let expected = Module {
+            is_test: false,
+            path: PathBuf::from("."),
+            spans: vec![Span::Lines(vec![
+                "start".to_owned(),
+                "/* block comments */".to_owned(),
+                "// line comments".to_owned(),
+                "start".to_owned(),
+                "contents".to_owned(),
+                "contents".to_owned(),
+                "end".to_owned(),
+                "end".to_owned(),
+            ])],
         };
         assert_eq!(result, expected);
     }
