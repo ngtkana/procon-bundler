@@ -1,3 +1,4 @@
+// procon_bundler_sample {{{
 mod procon_bundler_sample {
     mod a {
         #[macro_export]
@@ -43,3 +44,4 @@ mod procon_bundler_sample {
         my_macro! {}
     }
 }
+// }}}

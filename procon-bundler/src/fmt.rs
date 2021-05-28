@@ -6,6 +6,9 @@ use {
     },
 };
 
+static FOLD_MAKER_OPEN: &'static str = concat!("{", "{", "{");
+static FOLD_MAKER_CLOSE: &'static str = concat!("}", "}", "}");
+
 pub fn format_crate_to_string(my_crate: Crate) -> String {
     format!("{}", CrateFormatter(&my_crate))
 }
@@ -14,7 +17,15 @@ struct CrateFormatter<'a>(&'a Crate);
 
 impl Display for CrateFormatter<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        fmt_dfs(f, &self.0.name, &self.0.root, 0)
+        writeln!(
+            f,
+            "// {} {}",
+            self.0.name.replace('-', "_"),
+            FOLD_MAKER_OPEN,
+        )?;
+        fmt_dfs(f, &self.0.name, &self.0.root, 0)?;
+        writeln!(f, "// {}", FOLD_MAKER_CLOSE)?;
+        Ok(())
     }
 }
 
@@ -82,12 +93,14 @@ mod tests {
         };
         let result = format_crate_to_string(w);
         let expected = concat!(
+            concat!("// holy_crate ", "{", "{", "{", "\n"),
             "mod holy_crate {\n",
             "    1\n",
             "    2\n",
             "    3\n",
             "    4\n",
             "}\n",
+            concat!("// ", "}", "}", "}", "\n"),
         );
         assert_eq!(result, expected);
     }
@@ -120,6 +133,7 @@ mod tests {
         };
         let result = format_crate_to_string(w);
         let expected = concat!(
+            concat!("// holy_crate ", "{", "{", "{", "\n"),
             "mod holy_crate {\n",
             "    start root\n",
             "    mod a {\n",
@@ -131,6 +145,7 @@ mod tests {
             "    }\n",
             "    end root\n",
             "}\n",
+            concat!("// ", "}", "}", "}", "\n"),
         );
         assert_eq!(result, expected);
     }
