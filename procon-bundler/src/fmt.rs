@@ -33,7 +33,7 @@ pub fn fmt_dfs(
                 .unwrap_or_else(|| panic!("OsStr から str に変換できませんでした。"))
                 .to_owned()
         })
-        .unwrap_or(crate_name.replace('-', "_"));
+        .unwrap_or_else(|| crate_name.replace('-', "_"));
     let indent = repeat(' ')
         .take(indent_level * TAB_LENGTH)
         .collect::<String>();

@@ -211,13 +211,13 @@ mod tests {
     #[test_case("let _: crate_a::Type = crate_a::Type::new()" => "let _: crate::crate_a::Type = crate::crate_a::Type::new()".to_owned(); "expand twice")]
     #[test_case("type X = (crate_a::A, crate_b::B);" => "type X = (crate::crate_a::A, crate::crate_b::B);".to_owned(); "expand two distinct crates")]
     fn test_substitute_non_macro_path(line: &str) -> String {
-        substitute_path(line, "my_crate", &build_sample_config_toml()).to_string()
+        substitute_path(line, "my_crate", &build_sample_config_toml())
     }
 
     #[test_case("$crate::a" => "$crate::my_crate::a".to_owned(); "simple $crate")]
     #[test_case("crate::a" => "crate::a".to_owned(); "not `$crate` but just `crate`")]
     fn test_substitute_macro_path(line: &str) -> String {
-        substitute_path(line, "my_crate", &build_sample_config_toml()).to_string()
+        substitute_path(line, "my_crate", &build_sample_config_toml())
     }
 
     fn build_sample_config_toml() -> ConfigToml {

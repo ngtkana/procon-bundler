@@ -24,20 +24,18 @@ impl Resolve for CrateResolver {
     // NOTE: mod.rs も探したい場合はここの実装も変えましょう！
     fn resolve(&self, module_path: &Path) -> Self::B {
         let mut buf = self.root.clone();
-        buf.push("src");
-        buf.push(
-            if module_path.to_str().unwrap_or_else(|| {
-                panic!(
-                    "OsStr -> str の変換ができません。module_path = {:?}",
-                    module_path
-                )
-            }) == "."
-            {
-                Path::new("lib")
-            } else {
+        let is_root = module_path.to_str().unwrap_or_else(|| {
+            panic!(
+                "OsStr -> str の変換ができません。module_path = {:?}",
                 module_path
-            },
-        );
+            )
+        }) == ".";
+        buf.push("src");
+        buf.push(if is_root {
+            Path::new("lib")
+        } else {
+            module_path
+        });
         buf.set_extension("rs");
         BufReader::new(File::open(&buf).unwrap_or_else(|e| {
             panic!(
