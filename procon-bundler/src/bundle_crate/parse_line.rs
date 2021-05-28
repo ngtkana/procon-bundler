@@ -105,8 +105,20 @@ pub fn remove_indentation(line: &str, indent_level: usize) -> String {
 
 // パスの置換をします。
 pub fn substitute_path<'a>(line: &'a str, crate_name: &str, config: &ConfigToml) -> String {
-    pub fn self_macros(line: &str, crate_name: &str) -> String {
-        line.replace("$crate", &format!("$crate::{}", crate_name))
+    pub fn crates(line: &str, crate_name: &str) -> String {
+        lazy_static! {
+            static ref RE: Regex = Regex::new(r#"([^\$])crate::"#).unwrap();
+        }
+        RE.replace_all(line, |caps: &Captures| {
+            format!("{}crate::{}::", &caps[1], crate_name.replace('-', "_"))
+        })
+        .into_owned()
+    }
+    pub fn crate_macros(line: &str, crate_name: &str) -> String {
+        line.replace(
+            "$crate",
+            &format!("$crate::{}", crate_name.replace('-', &"_")),
+        )
     }
     pub fn non_macro<'a>(line: &'a str, config: &ConfigToml) -> Cow<'a, str> {
         fn replace(caps: &Captures, config: &ConfigToml) -> String {
@@ -123,7 +135,8 @@ pub fn substitute_path<'a>(line: &'a str, crate_name: &str, config: &ConfigToml)
         }
         RE.replace_all(line, |caps: &Captures| replace(caps, config))
     }
-    let line = self_macros(line, crate_name);
+    let line = crates(line, crate_name);
+    let line = crate_macros(&line, crate_name);
     non_macro(&line, config).into_owned()
 }
 

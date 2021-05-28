@@ -25,15 +25,27 @@ impl Resolve for CrateResolver {
     fn resolve(&self, module_path: &Path) -> Self::B {
         let mut buf = self.root.clone();
         buf.push("src");
-        buf.push(module_path);
+        buf.push(
+            if module_path.to_str().unwrap_or_else(|| {
+                panic!(
+                    "OsStr -> str の変換ができません。module_path = {:?}",
+                    module_path
+                )
+            }) == "."
+            {
+                Path::new("lib")
+            } else {
+                module_path
+            },
+        );
         buf.set_extension("rs");
-        BufReader::new(File::open(buf).unwrap_or_else(|e| {
+        BufReader::new(File::open(&buf).unwrap_or_else(|e| {
             panic!(
                 concat!(
                     "モジュールパスからファイルへの解決に失敗しました。",
-                    "module_path = {:?}, e = {:?}",
+                    "module_path = {:?}, path = {:?}, e = {:?}",
                 ),
-                module_path, e
+                module_path, &buf, e
             )
         }))
     }
@@ -78,23 +90,14 @@ mod tests {
     fn test_resolve_depth_1() {
         let mut s = String::new();
 
-        let crate_resolver = CrateResolver::new(PathBuf::from("testcase/sample_crate"));
+        let crate_resolver = CrateResolver::new(PathBuf::from("../procon-bundler-sample"));
         crate_resolver
-            .resolve(Path::new("a"))
+            .resolve(Path::new("small_module"))
             .read_to_string(&mut s)
             .unwrap();
-        assert_eq!(s.as_str(), "Hi, I am a.rs!\n");
-    }
-
-    #[test]
-    fn test_resolve_depth_2() {
-        let mut s = String::new();
-
-        let crate_resolver = CrateResolver::new(PathBuf::from("testcase/sample_crate"));
-        crate_resolver
-            .resolve(Path::new("b/b1"))
-            .read_to_string(&mut s)
-            .unwrap();
-        assert_eq!(s.as_str(), "Hi, I am b1.rs!\n");
+        assert_eq!(
+            s.as_str(),
+            concat!("#[allow(dead_code)]\n", "pub type A = ();\n",)
+        );
     }
 }

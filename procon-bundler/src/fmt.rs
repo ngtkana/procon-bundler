@@ -1,19 +1,20 @@
 use {
-    crate::{Module, Span, TAB, TAB_LENGTH},
+    crate::{Crate, Module, Span, TAB, TAB_LENGTH},
     std::{
-        fmt::{Debug, Formatter, Result, Write},
+        fmt::{Display, Formatter, Result, Write},
         iter::repeat,
     },
 };
 
-#[derive(Clone, Hash, PartialEq, Copy)]
-pub struct CrateWriter<'a> {
-    name: &'a str,
-    root: &'a Module,
+pub fn format_crate_to_string(my_crate: Crate) -> String {
+    format!("{}", CrateFormatter(&my_crate))
 }
-impl<'a> Debug for CrateWriter<'a> {
+
+struct CrateFormatter<'a>(&'a Crate);
+
+impl Display for CrateFormatter<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        fmt_dfs(f, self.name, self.root, 0)
+        fmt_dfs(f, &self.0.name, &self.0.root, 0)
     }
 }
 
@@ -30,12 +31,13 @@ pub fn fmt_dfs(
         .map(|s| {
             s.to_str()
                 .unwrap_or_else(|| panic!("OsStr から str に変換できませんでした。"))
+                .to_owned()
         })
-        .unwrap_or(crate_name);
+        .unwrap_or(crate_name.replace('-', "_"));
     let indent = repeat(' ')
         .take(indent_level * TAB_LENGTH)
         .collect::<String>();
-    writeln!(w, "{}mod {} {{", &indent, name)?;
+    writeln!(w, "{}mod {} {{", &indent, &name)?;
     for span in &module.spans {
         match span {
             Span::Lines(lines) => {
@@ -56,16 +58,18 @@ pub fn fmt_dfs(
 
 #[cfg(test)]
 mod tests {
+    use crate::format_crate_to_string;
+
     use {
-        super::{CrateWriter, Module, Span},
+        super::{Crate, Module, Span},
         std::path::PathBuf,
     };
 
     #[test]
     fn test_single_module() {
-        let w = CrateWriter {
-            name: "holy_crate",
-            root: &Module {
+        let w = Crate {
+            name: "holy_crate".to_owned(),
+            root: Module {
                 is_test: false,
                 path: PathBuf::from("."),
                 spans: vec![Span::Lines(vec![
@@ -76,7 +80,7 @@ mod tests {
                 ])],
             },
         };
-        let result = format!("{:?}", w);
+        let result = format_crate_to_string(w);
         let expected = concat!(
             "mod holy_crate {\n",
             "    1\n",
@@ -90,9 +94,9 @@ mod tests {
 
     #[test]
     fn test_deep_modules() {
-        let w = CrateWriter {
-            name: "holy_crate",
-            root: &Module {
+        let w = Crate {
+            name: "holy_crate".to_owned(),
+            root: Module {
                 is_test: false,
                 path: PathBuf::from("."),
                 spans: vec![
@@ -114,7 +118,7 @@ mod tests {
                 ],
             },
         };
-        let result = format!("{:?}", w);
+        let result = format_crate_to_string(w);
         let expected = concat!(
             "mod holy_crate {\n",
             "    start root\n",

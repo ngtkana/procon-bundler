@@ -1,6 +1,12 @@
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Default, Hash, PartialEq)]
+pub struct Crate {
+    pub name: String,
+    pub root: Module,
+}
+
+#[derive(Clone, Debug, Default, Hash, PartialEq)]
 pub struct Module {
     pub path: PathBuf,
     pub spans: Vec<Span>,

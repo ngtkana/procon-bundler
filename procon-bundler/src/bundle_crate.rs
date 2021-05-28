@@ -3,7 +3,7 @@ use std::mem::take;
 mod parse_line;
 
 use {
-    crate::{ConfigToml, Module, Resolve, Span, TAB_LENGTH},
+    crate::{ConfigToml, Crate, Module, Resolve, Span, TAB_LENGTH},
     parse_line::{
         parse_block_doc_comments_end, parse_block_doc_comments_start, parse_block_end,
         parse_cfg_test, parse_module_block_begin, parse_module_decl, parse_oneline_doc_comments,
@@ -15,7 +15,7 @@ use {
     },
 };
 
-pub fn bundle_crate<R: Resolve>(crate_name: &str, resolver: R, config_toml: ConfigToml) -> Module {
+pub fn bundle_crate<R: Resolve>(crate_name: &str, resolver: R, config_toml: ConfigToml) -> Crate {
     CrateBundler::new(crate_name, resolver, config_toml).bundle_crate()
 }
 
@@ -34,9 +34,12 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
             config_toml,
         }
     }
-    fn bundle_crate(&mut self) -> Module {
+    fn bundle_crate(&mut self) -> Crate {
         let reader = self.resolver.resolve(Path::new("."));
-        self.bundle_module(reader, PathBuf::from("."))
+        Crate {
+            name: self.crate_name.to_owned(),
+            root: self.bundle_module(reader, PathBuf::from(".")),
+        }
     }
     fn bundle_module(&mut self, reader: impl BufRead, mut current_module_path: PathBuf) -> Module {
         // 結果がモジュール別に格納されるスタック
@@ -159,7 +162,7 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
 #[cfg(test)]
 mod tests {
     use {
-        super::{bundle_crate, Module, Span},
+        super::{bundle_crate, Crate, Module, Span},
         crate::{manual_resolver, ConfigToml},
         std::path::PathBuf,
     };
@@ -175,10 +178,13 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![Span::Lines(vec!["hi,".to_owned(), "hello!".to_owned()])],
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
+                is_test: false,
+                path: PathBuf::from("."),
+                spans: vec![Span::Lines(vec!["hi,".to_owned(), "hello!".to_owned()])],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -214,19 +220,22 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![Span::Lines(vec![
-                "start".to_owned(),
-                "/* block comments */".to_owned(),
-                "// line comments".to_owned(),
-                "start".to_owned(),
-                "contents".to_owned(),
-                "contents".to_owned(),
-                "end".to_owned(),
-                "end".to_owned(),
-            ])],
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
+                is_test: false,
+                path: PathBuf::from("."),
+                spans: vec![Span::Lines(vec![
+                    "start".to_owned(),
+                    "/* block comments */".to_owned(),
+                    "// line comments".to_owned(),
+                    "start".to_owned(),
+                    "contents".to_owned(),
+                    "contents".to_owned(),
+                    "end".to_owned(),
+                    "end".to_owned(),
+                ])],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -247,21 +256,24 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![
-                Span::Lines(vec!["hi,".to_owned()]),
-                Span::Module(Box::new(Module {
-                    is_test: false,
-                    path: PathBuf::from("./a"),
-                    spans: vec![Span::Lines(vec![
-                        "a also says: hi,".to_owned(),
-                        "a also says: hello!".to_owned(),
-                    ])],
-                })),
-                Span::Lines(vec!["hello!".to_owned()]),
-            ],
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
+                is_test: false,
+                path: PathBuf::from("."),
+                spans: vec![
+                    Span::Lines(vec!["hi,".to_owned()]),
+                    Span::Module(Box::new(Module {
+                        is_test: false,
+                        path: PathBuf::from("./a"),
+                        spans: vec![Span::Lines(vec![
+                            "a also says: hi,".to_owned(),
+                            "a also says: hello!".to_owned(),
+                        ])],
+                    })),
+                    Span::Lines(vec!["hello!".to_owned()]),
+                ],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -283,21 +295,24 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![
-                Span::Lines(vec!["hi,".to_owned()]),
-                Span::Module(Box::new(Module {
-                    is_test: true,
-                    path: PathBuf::from("./a"),
-                    spans: vec![Span::Lines(vec![
-                        "a also says: hi,".to_owned(),
-                        "a also says: hello!".to_owned(),
-                    ])],
-                })),
-                Span::Lines(vec!["hello!".to_owned()]),
-            ],
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
+                is_test: false,
+                path: PathBuf::from("."),
+                spans: vec![
+                    Span::Lines(vec!["hi,".to_owned()]),
+                    Span::Module(Box::new(Module {
+                        is_test: true,
+                        path: PathBuf::from("./a"),
+                        spans: vec![Span::Lines(vec![
+                            "a also says: hi,".to_owned(),
+                            "a also says: hello!".to_owned(),
+                        ])],
+                    })),
+                    Span::Lines(vec!["hello!".to_owned()]),
+                ],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -318,22 +333,25 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![
-                Span::Lines(vec!["hi,".to_owned()]),
-                Span::Module(Box::new(Module {
-                    is_test: false,
-                    path: PathBuf::from("./a"),
-                    spans: vec![Span::Lines(vec![
-                        "hey".to_owned(),
-                        "shallow".to_owned(),
-                        " deep".to_owned(),
-                    ])],
-                })),
-                Span::Lines(vec!["hello!".to_owned()]),
-            ],
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
+                is_test: false,
+                path: PathBuf::from("."),
+                spans: vec![
+                    Span::Lines(vec!["hi,".to_owned()]),
+                    Span::Module(Box::new(Module {
+                        is_test: false,
+                        path: PathBuf::from("./a"),
+                        spans: vec![Span::Lines(vec![
+                            "hey".to_owned(),
+                            "shallow".to_owned(),
+                            " deep".to_owned(),
+                        ])],
+                    })),
+                    Span::Lines(vec!["hello!".to_owned()]),
+                ],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -355,22 +373,25 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![
-                Span::Lines(vec!["hi,".to_owned()]),
-                Span::Module(Box::new(Module {
-                    is_test: true,
-                    path: PathBuf::from("./a"),
-                    spans: vec![Span::Lines(vec![
-                        "hey".to_owned(),
-                        "shallow".to_owned(),
-                        " deep".to_owned(),
-                    ])],
-                })),
-                Span::Lines(vec!["hello!".to_owned()]),
-            ],
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
+                is_test: false,
+                path: PathBuf::from("."),
+                spans: vec![
+                    Span::Lines(vec!["hi,".to_owned()]),
+                    Span::Module(Box::new(Module {
+                        is_test: true,
+                        path: PathBuf::from("./a"),
+                        spans: vec![Span::Lines(vec![
+                            "hey".to_owned(),
+                            "shallow".to_owned(),
+                            " deep".to_owned(),
+                        ])],
+                    })),
+                    Span::Lines(vec!["hello!".to_owned()]),
+                ],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -402,45 +423,48 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![
-                Span::Lines(vec!["begin .".to_owned()]),
-                Span::Module(Box::new(Module {
-                    is_test: false,
-                    path: PathBuf::from("./a"),
-                    spans: vec![
-                        Span::Lines(vec!["begin a".to_owned()]),
-                        Span::Module(Box::new(Module {
-                            is_test: false,
-                            path: PathBuf::from("./a/b"),
-                            spans: vec![
-                                Span::Lines(vec!["begin b".to_owned()]),
-                                Span::Module(Box::new(Module {
-                                    is_test: false,
-                                    path: PathBuf::from("./a/b/c"),
-                                    spans: vec![
-                                        Span::Lines(vec!["begin c".to_owned()]),
-                                        Span::Module(Box::new(Module {
-                                            is_test: false,
-                                            path: PathBuf::from("./a/b/c/d"),
-                                            spans: vec![Span::Lines(vec![
-                                                "begin d".to_owned(),
-                                                "end d".to_owned(),
-                                            ])],
-                                        })),
-                                        Span::Lines(vec!["end c".to_owned()]),
-                                    ],
-                                })),
-                                Span::Lines(vec!["end b".to_owned()]),
-                            ],
-                        })),
-                        Span::Lines(vec!["end a".to_owned()]),
-                    ],
-                })),
-                Span::Lines(vec!["end .".to_owned()]),
-            ],
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
+                is_test: false,
+                path: PathBuf::from("."),
+                spans: vec![
+                    Span::Lines(vec!["begin .".to_owned()]),
+                    Span::Module(Box::new(Module {
+                        is_test: false,
+                        path: PathBuf::from("./a"),
+                        spans: vec![
+                            Span::Lines(vec!["begin a".to_owned()]),
+                            Span::Module(Box::new(Module {
+                                is_test: false,
+                                path: PathBuf::from("./a/b"),
+                                spans: vec![
+                                    Span::Lines(vec!["begin b".to_owned()]),
+                                    Span::Module(Box::new(Module {
+                                        is_test: false,
+                                        path: PathBuf::from("./a/b/c"),
+                                        spans: vec![
+                                            Span::Lines(vec!["begin c".to_owned()]),
+                                            Span::Module(Box::new(Module {
+                                                is_test: false,
+                                                path: PathBuf::from("./a/b/c/d"),
+                                                spans: vec![Span::Lines(vec![
+                                                    "begin d".to_owned(),
+                                                    "end d".to_owned(),
+                                                ])],
+                                            })),
+                                            Span::Lines(vec!["end c".to_owned()]),
+                                        ],
+                                    })),
+                                    Span::Lines(vec!["end b".to_owned()]),
+                                ],
+                            })),
+                            Span::Lines(vec!["end a".to_owned()]),
+                        ],
+                    })),
+                    Span::Lines(vec!["end .".to_owned()]),
+                ],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -476,45 +500,48 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![
-                Span::Lines(vec!["begin .".to_owned()]),
-                Span::Module(Box::new(Module {
-                    is_test: false,
-                    path: PathBuf::from("./a"),
-                    spans: vec![
-                        Span::Lines(vec!["begin a".to_owned()]),
-                        Span::Module(Box::new(Module {
-                            is_test: false,
-                            path: PathBuf::from("./a/b"),
-                            spans: vec![
-                                Span::Lines(vec!["begin b".to_owned()]),
-                                Span::Module(Box::new(Module {
-                                    is_test: false,
-                                    path: PathBuf::from("./a/b/c"),
-                                    spans: vec![
-                                        Span::Lines(vec!["begin c".to_owned()]),
-                                        Span::Module(Box::new(Module {
-                                            is_test: false,
-                                            path: PathBuf::from("./a/b/c/d"),
-                                            spans: vec![Span::Lines(vec![
-                                                "begin d".to_owned(),
-                                                "end d".to_owned(),
-                                            ])],
-                                        })),
-                                        Span::Lines(vec!["end c".to_owned()]),
-                                    ],
-                                })),
-                                Span::Lines(vec!["end b".to_owned()]),
-                            ],
-                        })),
-                        Span::Lines(vec!["end a".to_owned()]),
-                    ],
-                })),
-                Span::Lines(vec!["end .".to_owned()]),
-            ],
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
+                is_test: false,
+                path: PathBuf::from("."),
+                spans: vec![
+                    Span::Lines(vec!["begin .".to_owned()]),
+                    Span::Module(Box::new(Module {
+                        is_test: false,
+                        path: PathBuf::from("./a"),
+                        spans: vec![
+                            Span::Lines(vec!["begin a".to_owned()]),
+                            Span::Module(Box::new(Module {
+                                is_test: false,
+                                path: PathBuf::from("./a/b"),
+                                spans: vec![
+                                    Span::Lines(vec!["begin b".to_owned()]),
+                                    Span::Module(Box::new(Module {
+                                        is_test: false,
+                                        path: PathBuf::from("./a/b/c"),
+                                        spans: vec![
+                                            Span::Lines(vec!["begin c".to_owned()]),
+                                            Span::Module(Box::new(Module {
+                                                is_test: false,
+                                                path: PathBuf::from("./a/b/c/d"),
+                                                spans: vec![Span::Lines(vec![
+                                                    "begin d".to_owned(),
+                                                    "end d".to_owned(),
+                                                ])],
+                                            })),
+                                            Span::Lines(vec!["end c".to_owned()]),
+                                        ],
+                                    })),
+                                    Span::Lines(vec!["end b".to_owned()]),
+                                ],
+                            })),
+                            Span::Lines(vec!["end a".to_owned()]),
+                        ],
+                    })),
+                    Span::Lines(vec!["end .".to_owned()]),
+                ],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -548,38 +575,41 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![
-                Span::Lines(vec!["begin .".to_owned()]),
-                Span::Module(Box::new(Module {
-                    is_test: false,
-                    path: PathBuf::from("./a"),
-                    spans: vec![Span::Lines(vec!["begin a".to_owned(), "end a".to_owned()])],
-                })),
-                Span::Lines(vec![
-                    "between a and b".to_owned(),
-                    "between a and b".to_owned(),
-                    "between a and b".to_owned(),
-                ]),
-                Span::Module(Box::new(Module {
-                    is_test: false,
-                    path: PathBuf::from("./b"),
-                    spans: vec![Span::Lines(vec!["begin b".to_owned(), "end b".to_owned()])],
-                })),
-                Span::Lines(vec![
-                    "between b and c".to_owned(),
-                    "between b and c".to_owned(),
-                    "between b and c".to_owned(),
-                ]),
-                Span::Module(Box::new(Module {
-                    is_test: false,
-                    path: PathBuf::from("./c"),
-                    spans: vec![Span::Lines(vec!["begin c".to_owned(), "end c".to_owned()])],
-                })),
-                Span::Lines(vec!["end .".to_owned()]),
-            ],
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
+                is_test: false,
+                path: PathBuf::from("."),
+                spans: vec![
+                    Span::Lines(vec!["begin .".to_owned()]),
+                    Span::Module(Box::new(Module {
+                        is_test: false,
+                        path: PathBuf::from("./a"),
+                        spans: vec![Span::Lines(vec!["begin a".to_owned(), "end a".to_owned()])],
+                    })),
+                    Span::Lines(vec![
+                        "between a and b".to_owned(),
+                        "between a and b".to_owned(),
+                        "between a and b".to_owned(),
+                    ]),
+                    Span::Module(Box::new(Module {
+                        is_test: false,
+                        path: PathBuf::from("./b"),
+                        spans: vec![Span::Lines(vec!["begin b".to_owned(), "end b".to_owned()])],
+                    })),
+                    Span::Lines(vec![
+                        "between b and c".to_owned(),
+                        "between b and c".to_owned(),
+                        "between b and c".to_owned(),
+                    ]),
+                    Span::Module(Box::new(Module {
+                        is_test: false,
+                        path: PathBuf::from("./c"),
+                        spans: vec![Span::Lines(vec!["begin c".to_owned(), "end c".to_owned()])],
+                    })),
+                    Span::Lines(vec!["end .".to_owned()]),
+                ],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -615,56 +645,59 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![Span::Module(Box::new(Module {
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
                 is_test: false,
-                path: PathBuf::from("./a"),
+                path: PathBuf::from("."),
                 spans: vec![Span::Module(Box::new(Module {
                     is_test: false,
-                    path: PathBuf::from("./a/b"),
+                    path: PathBuf::from("./a"),
                     spans: vec![Span::Module(Box::new(Module {
                         is_test: false,
-                        path: PathBuf::from("./a/b/c"),
+                        path: PathBuf::from("./a/b"),
                         spans: vec![Span::Module(Box::new(Module {
                             is_test: false,
-                            path: PathBuf::from("./a/b/c/d"),
-                            spans: vec![
-                                Span::Lines(vec![
-                                    "before e".to_owned(),
-                                    "before e".to_owned(),
-                                    "before e".to_owned(),
-                                ]),
-                                Span::Module(Box::new(Module {
-                                    is_test: false,
-                                    path: PathBuf::from("./a/b/c/d/e"),
-                                    spans: vec![Span::Module(Box::new(Module {
+                            path: PathBuf::from("./a/b/c"),
+                            spans: vec![Span::Module(Box::new(Module {
+                                is_test: false,
+                                path: PathBuf::from("./a/b/c/d"),
+                                spans: vec![
+                                    Span::Lines(vec![
+                                        "before e".to_owned(),
+                                        "before e".to_owned(),
+                                        "before e".to_owned(),
+                                    ]),
+                                    Span::Module(Box::new(Module {
                                         is_test: false,
-                                        path: PathBuf::from("./a/b/c/d/e/f"),
-                                        spans: vec![Span::Lines(vec!["in f".to_owned()])],
-                                    }))],
-                                })),
-                                Span::Lines(vec![
-                                    "between e and g".to_owned(),
-                                    "between e and g".to_owned(),
-                                    "between e and g".to_owned(),
-                                ]),
-                                Span::Module(Box::new(Module {
-                                    is_test: false,
-                                    path: PathBuf::from("./a/b/c/d/g"),
-                                    spans: vec![Span::Lines(vec!["in g".to_owned()])],
-                                })),
-                                Span::Lines(vec![
-                                    "after g".to_owned(),
-                                    "after g".to_owned(),
-                                    "after g".to_owned(),
-                                ]),
-                            ],
+                                        path: PathBuf::from("./a/b/c/d/e"),
+                                        spans: vec![Span::Module(Box::new(Module {
+                                            is_test: false,
+                                            path: PathBuf::from("./a/b/c/d/e/f"),
+                                            spans: vec![Span::Lines(vec!["in f".to_owned()])],
+                                        }))],
+                                    })),
+                                    Span::Lines(vec![
+                                        "between e and g".to_owned(),
+                                        "between e and g".to_owned(),
+                                        "between e and g".to_owned(),
+                                    ]),
+                                    Span::Module(Box::new(Module {
+                                        is_test: false,
+                                        path: PathBuf::from("./a/b/c/d/g"),
+                                        spans: vec![Span::Lines(vec!["in g".to_owned()])],
+                                    })),
+                                    Span::Lines(vec![
+                                        "after g".to_owned(),
+                                        "after g".to_owned(),
+                                        "after g".to_owned(),
+                                    ]),
+                                ],
+                            }))],
                         }))],
                     }))],
                 }))],
-            }))],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -679,10 +712,13 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, build_sample_config_toml());
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![Span::Lines(vec!["use crate::crate_a::item_a;".to_owned()])],
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
+                is_test: false,
+                path: PathBuf::from("."),
+                spans: vec![Span::Lines(vec!["use crate::crate_a::item_a;".to_owned()])],
+            },
         };
         assert_eq!(result, expected);
     }
@@ -699,14 +735,17 @@ mod tests {
             }
         }
         let result = bundle_crate("my_crate", ManualResolver {}, build_sample_config_toml());
-        let expected = Module {
-            is_test: false,
-            path: PathBuf::from("."),
-            spans: vec![Span::Module(Box::new(Module {
+        let expected = Crate {
+            name: "my_crate".to_owned(),
+            root: Module {
                 is_test: false,
-                path: PathBuf::from("./a"),
-                spans: vec![Span::Lines(vec!["use crate::crate_a::item_a;".to_owned()])],
-            }))],
+                path: PathBuf::from("."),
+                spans: vec![Span::Module(Box::new(Module {
+                    is_test: false,
+                    path: PathBuf::from("./a"),
+                    spans: vec![Span::Lines(vec!["use crate::crate_a::item_a;".to_owned()])],
+                }))],
+            },
         };
         assert_eq!(result, expected);
     }
