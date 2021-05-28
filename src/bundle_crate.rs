@@ -15,19 +15,21 @@ use {
     },
 };
 
-pub fn bundle_crate<R: Resolve>(resolver: R, config_toml: ConfigToml) -> Module {
-    CrateBundler::new(resolver, config_toml).bundle_crate()
+pub fn bundle_crate<R: Resolve>(crate_name: &str, resolver: R, config_toml: ConfigToml) -> Module {
+    CrateBundler::new(crate_name, resolver, config_toml).bundle_crate()
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-struct CrateBundler<R> {
+struct CrateBundler<'a, R> {
+    crate_name: &'a str,
     resolver: R,
     config_toml: ConfigToml,
 }
 
-impl<R: Resolve> CrateBundler<R> {
-    fn new(resolver: R, config_toml: ConfigToml) -> Self {
+impl<'a, R: Resolve> CrateBundler<'a, R> {
+    fn new(crate_name: &'a str, resolver: R, config_toml: ConfigToml) -> Self {
         Self {
+            crate_name,
             resolver,
             config_toml,
         }
@@ -140,7 +142,7 @@ impl<R: Resolve> CrateBundler<R> {
                 match spans.last_mut().unwrap() {
                     Span::Lines(ref mut lines) => {
                         lines.push(remove_indentation(
-                            substitute_path(&line, &self.config_toml).as_ref(),
+                            substitute_path(&line, &self.crate_name, &self.config_toml).as_ref(),
                             stack_len - 1,
                         ));
                     }
@@ -172,7 +174,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -211,7 +213,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -244,7 +246,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -280,7 +282,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -315,7 +317,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -352,7 +354,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -399,7 +401,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -473,7 +475,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -545,7 +547,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -612,7 +614,7 @@ mod tests {
                 "./a/b/c/d/g" => "in g",
             }
         }
-        let result = bundle_crate(ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -676,7 +678,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, build_sample_config_toml());
+        let result = bundle_crate("my_crate", ManualResolver {}, build_sample_config_toml());
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),
@@ -696,7 +698,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate(ManualResolver {}, build_sample_config_toml());
+        let result = bundle_crate("my_crate", ManualResolver {}, build_sample_config_toml());
         let expected = Module {
             is_test: false,
             path: PathBuf::from("."),

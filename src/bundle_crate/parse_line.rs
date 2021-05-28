@@ -104,20 +104,27 @@ pub fn remove_indentation(line: &str, indent_level: usize) -> String {
 }
 
 // パスの置換をします。
-pub fn substitute_path<'a>(line: &'a str, config: &ConfigToml) -> Cow<'a, str> {
-    fn replace(caps: &Captures, config: &ConfigToml) -> String {
-        let name = caps.name("name").unwrap().as_str();
-        if config.deps.contains_key(name) {
-            format!("crate::{}::", name)
-        } else {
-            format!("{}::", name)
+pub fn substitute_path<'a>(line: &'a str, crate_name: &str, config: &ConfigToml) -> String {
+    pub fn self_macros(line: &str, crate_name: &str) -> String {
+        line.replace("$crate", &format!("$crate::{}", crate_name))
+    }
+    pub fn non_macro<'a>(line: &'a str, config: &ConfigToml) -> Cow<'a, str> {
+        fn replace(caps: &Captures, config: &ConfigToml) -> String {
+            let name = caps.name("name").unwrap().as_str();
+            if config.deps.contains_key(name) {
+                format!("crate::{}::", name)
+            } else {
+                format!("{}::", name)
+            }
         }
+        lazy_static! {
+            static ref RE: Regex =
+                Regex::new(r#"(?P<name>[A-Za-z_][A-Za-z0-9_\-]*)(\u{3A}){2}"#).unwrap();
+        }
+        RE.replace_all(line, |caps: &Captures| replace(caps, config))
     }
-    lazy_static! {
-        static ref RE: Regex =
-            Regex::new(r#"(?P<name>[A-Za-z_][A-Za-z0-9_\-]*)(\u{3A}){2}"#).unwrap();
-    }
-    RE.replace_all(line, |caps: &Captures| replace(caps, config))
+    let line = self_macros(line, crate_name);
+    non_macro(&line, config).into_owned()
 }
 
 #[cfg(test)]
@@ -190,8 +197,14 @@ mod tests {
     #[test_case("use crate_never::f" => "use crate_never::f".to_owned(); "not in deps")]
     #[test_case("let _: crate_a::Type = crate_a::Type::new()" => "let _: crate::crate_a::Type = crate::crate_a::Type::new()".to_owned(); "expand twice")]
     #[test_case("type X = (crate_a::A, crate_b::B);" => "type X = (crate::crate_a::A, crate::crate_b::B);".to_owned(); "expand two distinct crates")]
-    fn test_substitute_path(line: &str) -> String {
-        substitute_path(line, &build_sample_config_toml()).to_string()
+    fn test_substitute_non_macro_path(line: &str) -> String {
+        substitute_path(line, "my_crate", &build_sample_config_toml()).to_string()
+    }
+
+    #[test_case("$crate::a" => "$crate::my_crate::a".to_owned(); "simple $crate")]
+    #[test_case("crate::a" => "crate::a".to_owned(); "not `$crate` but just `crate`")]
+    fn test_substitute_macro_path(line: &str) -> String {
+        substitute_path(line, "my_crate", &build_sample_config_toml()).to_string()
     }
 
     fn build_sample_config_toml() -> ConfigToml {
