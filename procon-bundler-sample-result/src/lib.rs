@@ -1,4 +1,5 @@
 // procon_bundler_sample {{{
+#[allow(dead_code)]
 mod procon_bundler_sample {
     mod a {
         #[macro_export]

@@ -23,6 +23,7 @@ impl Display for CrateFormatter<'_> {
             self.0.name.replace('-', "_"),
             FOLD_MAKER_OPEN,
         )?;
+        writeln!(f, "#[allow(dead_code)]")?;
         fmt_dfs(f, &self.0.name, &self.0.root, 0)?;
         writeln!(f, "// {}", FOLD_MAKER_CLOSE)?;
         Ok(())
@@ -94,6 +95,7 @@ mod tests {
         let result = format_crate_to_string(w);
         let expected = concat!(
             concat!("// holy_crate ", "{", "{", "{", "\n"),
+            "#[allow(dead_code)]\n",
             "mod holy_crate {\n",
             "    1\n",
             "    2\n",
@@ -134,6 +136,7 @@ mod tests {
         let result = format_crate_to_string(w);
         let expected = concat!(
             concat!("// holy_crate ", "{", "{", "{", "\n"),
+            "#[allow(dead_code)]\n",
             "mod holy_crate {\n",
             "    start root\n",
             "    mod a {\n",
