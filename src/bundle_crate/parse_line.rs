@@ -4,44 +4,47 @@ pub fn parse_module_decl(line: &str) -> Option<String> {
     lazy_static! {
         static ref RE: Regex = Regex::new(concat!(
             "^",
-            r#"\s*"#,                               // spaces
-            r#"((pub|pub\s*\([^\)]+\))\s+)?"#,      // vis (capture 1, 2)
-            r#"mod"#,                               // mod
-            r#"\s+"#,                               // space
-            r#"([a-z|A-Z|_]([a-z|A-Z|_|0-9]*))"#,   // name (capture 3, 4)
-            r#"\s*"#,                               // spaces
-            ";",                                    // semi
-            r#"\s*$"#,                              // spaces
+            r#"\s*"#,                                // spaces
+            r#"((pub|pub\s*\([^\)]+\))\s+)?"#,       // vis
+            r#"mod"#,                                // mod
+            r#"\s+"#,                                // space
+            r#"(?P<name>[a-zA-Z_]([a-zA-Z_0-9]*))"#, // name <- capture here!
+            r#"\s*"#,                                // spaces
+            ";",                                     // semi
+            r#"\s*$"#,                               // spaces
         ))
         .unwrap();
     }
-    RE.captures(line).map(|captures| captures[3].to_owned())
+    RE.captures(line)
+        .map(|captures| captures.name("name").unwrap().as_str().to_owned())
 }
 
 pub fn parse_module_block_begin(line: &str) -> Option<String> {
     lazy_static! {
         static ref RE: Regex = Regex::new(concat!(
             "^",
-            r#"\s*"#,                               // spaces
-            r#"((pub|pub\s*\([^\)]+\))\s+)?"#,      // vis (capture 1, 2)
-            r#"mod"#,                               // mod
-            r#"\s+"#,                               // space
-            r#"([a-z|A-Z|_]([a-z|A-Z|_|0-9]*))"#,   // name (capture 3, 4)
-            r#"\s*"#,                               // spaces
-            r#"\{"#,                                // opening brace
-            r#"\s*$"#,                              // spaces
+            r#"\s*"#,                                // spaces
+            r#"((pub|pub\s*\([^\)]+\))\s+)?"#,       // vis
+            r#"mod"#,                                // mod
+            r#"\s+"#,                                // space
+            r#"(?P<name>[a-zA-Z_]([a-zA-Z_0-9]*))"#, // name <- capture here!
+            r#"\s*"#,                                // spaces
+            r#"\{"#,                                 // opening brace
+            r#"\s*$"#,                               // spaces
         ))
         .unwrap();
     }
-    RE.captures(line).map(|captures| captures[3].to_owned())
+    RE.captures(line)
+        .map(|captures| captures.name("name").unwrap().as_str().to_owned())
 }
 
 // Leading spaces の個数を返します。
 pub fn parse_block_end(line: &str) -> Option<usize> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r#"^(\s*)\}\s*$"#).unwrap();
+        static ref RE: Regex = Regex::new(r#"^(?P<leading>\s*)\}\s*$"#).unwrap();
     }
-    RE.captures(line).map(|captures| captures[1].len())
+    RE.captures(line)
+        .map(|captures| captures.name("leading").unwrap().as_str().len())
 }
 
 // #[cfg(test)] であるかどうかを判定します。
