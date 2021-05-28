@@ -1,0 +1,10 @@
+name: procon-bundler
+version: "0.2"
+author: Nagata Kana <ngtkana@gmail.com>
+about: Bundles a crate into a depth-1 module.
+args:
+    - CRATE_ROOT:
+        index: 1
+        help: The path to the root to a crate to bundle.
+        takes_value: true
+        required: true

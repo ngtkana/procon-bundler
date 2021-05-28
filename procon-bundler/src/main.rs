@@ -1,5 +1,3 @@
-use std::{fs::File, io::Read};
-
 mod bundle_crate;
 mod config_toml;
 mod fmt;
@@ -8,10 +6,11 @@ mod types;
 
 pub use {
     bundle_crate::bundle_crate,
+    clap::{load_yaml, App},
     config_toml::ConfigToml,
     fmt::format_crate_to_string,
     resolver::{CrateResolver, Resolve},
-    std::path::Path,
+    std::{fs::File, io::Read, path::Path},
     types::{Crate, Module, Span},
 };
 
@@ -42,7 +41,16 @@ macro_rules! manual_resolver {
     };
 }
 
-pub fn bundle_by_crate_path(path: &Path) -> Crate {
+fn main() {
+    let yaml = clap::load_yaml!("cli.yml");
+    let matches = App::from_yaml(yaml).get_matches();
+
+    let crate_root = Path::new(matches.value_of("CRATE_ROOT").unwrap());
+    let result = bundle_to_string(crate_root);
+    println!("{}", result);
+}
+
+fn bundle_to_string(path: &Path) -> String {
     let name = path
         .file_stem()
         .unwrap_or_else(|| panic!("filestem がありません。 path = {:?}", path));
@@ -62,28 +70,18 @@ pub fn bundle_by_crate_path(path: &Path) -> Crate {
         .read_to_string(&mut buf)
         .unwrap_or_else(|_| panic!("Cargo.toml の中身がよめません。"));
     let config = ConfigToml::new(&buf);
-    bundle_crate(name, resolver, config)
+    let my_crate = bundle_crate(name, resolver, config);
+    format_crate_to_string(my_crate)
 }
-
-fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{bundle_by_crate_path, format_crate_to_string},
-        difference::assert_diff,
-        std::{fs::File, io::Read as _, path::Path},
-    };
+    use {super::bundle_to_string, difference::assert_diff, std::path::Path};
 
     #[test]
     fn test_bundle_by_crate_path() {
-        let result =
-            format_crate_to_string(bundle_by_crate_path(Path::new("../procon-bundler-sample")));
-        let mut expected = String::new();
-        File::open("../procon-bundler-sample-result/src/lib.rs")
-            .unwrap()
-            .read_to_string(&mut expected)
-            .unwrap();
+        let result = bundle_to_string(Path::new("../procon-bundler-sample"));
+        let expected = include_str!("../../procon-bundler-sample-result/src/lib.rs");
         let result = result.as_ref();
         let expected = expected.as_ref();
         assert_diff!(result, expected, "\n", 0);

@@ -12,6 +12,10 @@ mod procon_bundler_sample {
         mod b {
             #[allow(unused_imports)]
             use crate::procon_bundler_sample::A;
+            mod c {
+                #[allow(dead_code)]
+                type C = ();
+            }
         }
         #[allow(dead_code)]
         fn g() {
@@ -31,6 +35,9 @@ mod procon_bundler_sample {
     }
     #[allow(dead_code)]
     enum A {}
+    #[cfg(test)]
+    #[allow(dead_code)]
+    enum OnlyForTest {}
     #[allow(dead_code)]
     fn f() {
         my_macro! {}

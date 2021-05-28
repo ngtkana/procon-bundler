@@ -42,11 +42,31 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
         }
     }
     fn bundle_module(&mut self, reader: impl BufRead, mut current_module_path: PathBuf) -> Module {
+        fn push_line_to_stack<'a, R>(
+            me: &CrateBundler<'a, R>,
+            stack: &mut Vec<Module>,
+            line: &str,
+        ) {
+            let stack_len = stack.len();
+            let spans = &mut stack.last_mut().unwrap().spans;
+            if !matches!(spans.last(), Some(Span::Lines(_))) {
+                spans.push(Span::Lines(Vec::new()));
+            }
+            match spans.last_mut().unwrap() {
+                Span::Lines(ref mut lines) => {
+                    lines.push(remove_indentation(
+                        substitute_path(&line, &me.crate_name, &me.config_toml).as_ref(),
+                        stack_len - 1,
+                    ));
+                }
+                Span::Module(_) => unreachable!(),
+            }
+        }
         // 結果がモジュール別に格納されるスタック
         // （関数終了時には、要素数 1 になっているべきです。）
         let mut stack = vec![Module::new(current_module_path.clone())];
         // 未解決 #[cfg(test)] フラグ
-        let mut unresolved_test = false;
+        let mut unresolved_cfg_test = None::<UnresolvedCfgTest>;
         // doc comments 内フラグ
         let mut in_doc_comments = false;
 
@@ -67,14 +87,14 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
             // `needs_current_line` フラグが立つので、
             // 直後に回収します。
             if in_doc_comments {
-                // Case 0: ブロック doc comments の終了
+                // Case 1: ブロック doc comments の終了
                 // NOTE: `*/` は通常のブロックコメントの終了にも使われるので、
                 // フラグをチェックしています。
                 if parse_block_doc_comments_end(&line) {
                     in_doc_comments = false;
                 }
             } else if let Some(name) = parse_module_decl(&line) {
-                // Case 1: モジュール宣言
+                // Case 2: モジュール宣言
                 //
                 // * モジュールパスを変更して再帰呼出し
                 // * モジュールパスを戻す
@@ -85,7 +105,7 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
                     self.resolver.resolve(&current_module_path),
                     current_module_path.clone(),
                 );
-                module.is_test = take(&mut unresolved_test);
+                module.is_test = take(&mut unresolved_cfg_test).is_some();
                 stack
                     .last_mut()
                     .unwrap()
@@ -93,7 +113,7 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
                     .push(Span::Module(Box::new(module)));
                 current_module_path.pop();
             } else if let Some(name) = parse_module_block_begin(&line) {
-                // Case 2: インラインモジュールの開始
+                // Case 3: インラインモジュールの開始
                 //
                 // * モジュールパスを変更
                 // * スタックに新しいモジュールを積む
@@ -101,11 +121,11 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
                 //
                 current_module_path.push(name);
                 let mut module = Module::new(current_module_path.clone());
-                module.is_test = take(&mut unresolved_test);
+                module.is_test = take(&mut unresolved_cfg_test).is_some();
                 stack.push(module);
             } else if let Some(space_count) = parse_block_end(&line) {
                 if 2 <= stack.len() && space_count == (stack.len() - 2) * TAB_LENGTH {
-                    // Case 3: インラインモジュールの終了
+                    // Case 4: インラインモジュールの終了
                     //
                     // * 終了したモジュールをスタックから取り出してスカッシュ
                     // * モジュールパスを戻す
@@ -120,43 +140,44 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
                 } else {
                     needs_current_line = true;
                 }
-            } else if parse_cfg_test(&line) {
-                // Case 4: #[cfg(test)]
-                unresolved_test = true;
-            } else if parse_block_doc_comments_start(&line) {
-                // Case 5: ブロック doc comments の開始
-                assert_eq!(in_doc_comments, false);
-                in_doc_comments = true;
-            } else if parse_oneline_doc_comments(&line) || line.is_empty() {
-                // Case 6: oneline doc comments or 空行
-                //
-                // * なにもしません
             } else {
-                needs_current_line = true;
+                // 前回ループの Case 5 で見た #[cfg(test)] が、この時点で解決していないならば、
+                // モジュールではなかったので、遅ればせながらプッシュします。
+                if let Some(UnresolvedCfgTest::Unknown(cfg_test)) = unresolved_cfg_test {
+                    unresolved_cfg_test = Some(UnresolvedCfgTest::Module);
+                    push_line_to_stack(&self, &mut stack, &cfg_test);
+                }
+                if parse_cfg_test(&line) {
+                    // Case 5: #[cfg(test)]
+                    unresolved_cfg_test = Some(UnresolvedCfgTest::Unknown(line.to_owned()));
+                } else if parse_block_doc_comments_start(&line) {
+                    // Case 6: ブロック doc comments の開始
+                    assert_eq!(in_doc_comments, false);
+                    in_doc_comments = true;
+                } else if parse_oneline_doc_comments(&line) || line.is_empty() {
+                    // Case 7: oneline doc comments or 空行
+                    //
+                    // * なにもしません
+                } else {
+                    needs_current_line = true;
+                }
             }
 
             // 「この行を使う必要があるときに立てるフラグ」回収です。
             if needs_current_line {
-                let stack_len = stack.len();
-                let spans = &mut stack.last_mut().unwrap().spans;
-                if !matches!(spans.last(), Some(Span::Lines(_))) {
-                    spans.push(Span::Lines(Vec::new()));
-                }
-                match spans.last_mut().unwrap() {
-                    Span::Lines(ref mut lines) => {
-                        lines.push(remove_indentation(
-                            substitute_path(&line, &self.crate_name, &self.config_toml).as_ref(),
-                            stack_len - 1,
-                        ));
-                    }
-                    Span::Module(_) => unreachable!(),
-                }
+                push_line_to_stack(self, &mut stack, &line);
             }
         }
         let res = stack.pop().unwrap();
         assert!(stack.is_empty());
         res
     }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq)]
+enum UnresolvedCfgTest {
+    Unknown(String), // まだ mod の次がモジュールかどうかわからない状態
+    Module,          // モジュールと確定した状態
 }
 
 #[cfg(test)]

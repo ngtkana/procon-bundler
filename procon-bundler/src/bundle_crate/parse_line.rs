@@ -56,7 +56,7 @@ pub fn parse_block_end(line: &str) -> Option<usize> {
 // #[cfg(test)] であるかどうかを判定します。
 pub fn parse_cfg_test(line: &str) -> bool {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r#"\s*#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*"#).unwrap();
+        static ref RE: Regex = Regex::new(r#"^\s*#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*"#).unwrap();
     }
     RE.is_match(line)
 }
