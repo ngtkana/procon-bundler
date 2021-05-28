@@ -1,3 +1,5 @@
+use std::{fs::File, io::Read};
+
 mod bundle_crate;
 mod config_toml;
 mod fmt;
@@ -9,6 +11,7 @@ pub use {
     config_toml::ConfigToml,
     fmt::CrateWriter,
     resolver::{CrateResolver, Resolve},
+    std::path::Path,
     types::{Module, Span},
 };
 
@@ -37,6 +40,33 @@ macro_rules! manual_resolver {
             }
         }
     };
+}
+
+pub fn bundle_by_crate_path(path: &Path) -> Module {
+    let cann = path
+        .canonicalize()
+        .unwrap_or_else(|_| panic!("絶対パスを取得できません。 path = {:?}", path));
+    let name = cann
+        .as_path()
+        .file_stem()
+        .unwrap_or_else(|| panic!("filestem がありません。 path = {:?}", path));
+    let name = name
+        .to_str()
+        .unwrap_or_else(|| panic!("OsStr -> str の変換ができません。 path = {:?}", path));
+    let resolver = CrateResolver::new(path.to_path_buf());
+    let config_path = path.join("Config.toml");
+    let mut buf = String::new();
+    File::open(config_path.as_path())
+        .unwrap_or_else(|_| {
+            panic!(
+                "Config.toml が見つかりません。config_toml_path = {:?}",
+                config_path
+            )
+        })
+        .read_to_string(&mut buf)
+        .unwrap_or_else(|_| panic!("Config.toml の中身がよめません。"));
+    let config = ConfigToml::new(&buf);
+    bundle_crate(name, resolver, config)
 }
 
 fn main() {}
