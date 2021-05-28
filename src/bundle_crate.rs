@@ -7,6 +7,7 @@ use {
     parse_line::{
         parse_block_doc_comments_end, parse_block_doc_comments_start, parse_block_end,
         parse_cfg_test, parse_module_block_begin, parse_module_decl, parse_oneline_doc_comments,
+        remove_indentation, substitute_path,
     },
     std::{
         io::BufRead,
@@ -138,7 +139,10 @@ impl<R: Resolve> CrateBundler<R> {
                 }
                 match spans.last_mut().unwrap() {
                     Span::Lines(ref mut lines) => {
-                        lines.push(remove_indentation(&line, stack_len - 1));
+                        lines.push(remove_indentation(
+                            substitute_path(&line, &self.config_toml).as_ref(),
+                            stack_len - 1,
+                        ));
                     }
                     Span::Module(_) => unreachable!(),
                 }
@@ -148,32 +152,6 @@ impl<R: Resolve> CrateBundler<R> {
         assert!(stack.is_empty());
         res
     }
-}
-
-fn remove_indentation(line: &str, indent_level: usize) -> String {
-    let mut chars = line.chars().peekable();
-    let mut rest = indent_level * TAB_LENGTH;
-    while let Some(c) = chars.peek() {
-        match c {
-            ' ' => {
-                if rest == 0 {
-                    break;
-                } else {
-                    rest -= 1;
-                }
-            }
-            '\t' => {
-                if rest < TAB_LENGTH {
-                    break;
-                } else {
-                    rest -= TAB_LENGTH;
-                }
-            }
-            _ => break,
-        }
-        chars.next();
-    }
-    chars.collect::<String>()
 }
 
 #[cfg(test)]
@@ -687,5 +665,59 @@ mod tests {
             }))],
         };
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_simple_substitution() {
+        manual_resolver! {
+            struct ManualResolver {
+                "." => concat!(
+                    "use crate_a::item_a;\n",
+                ),
+            }
+        }
+        let result = bundle_crate(ManualResolver {}, build_sample_config_toml());
+        let expected = Module {
+            is_test: false,
+            path: PathBuf::from("."),
+            spans: vec![Span::Lines(vec!["use crate::crate_a::item_a;".to_owned()])],
+        };
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_substitute_at_deep_module() {
+        manual_resolver! {
+            struct ManualResolver {
+                "." => concat!(
+                    "mod a {\n",
+                    "    use crate_a::item_a;\n",
+                    "}\n",
+                ),
+            }
+        }
+        let result = bundle_crate(ManualResolver {}, build_sample_config_toml());
+        let expected = Module {
+            is_test: false,
+            path: PathBuf::from("."),
+            spans: vec![Span::Module(Box::new(Module {
+                is_test: false,
+                path: PathBuf::from("./a"),
+                spans: vec![Span::Lines(vec!["use crate::crate_a::item_a;".to_owned()])],
+            }))],
+        };
+        assert_eq!(result, expected);
+    }
+
+    fn build_sample_config_toml() -> ConfigToml {
+        ConfigToml::new(
+            r#"
+            [dependencies]
+            crate_a = { path = "../crate_a" }
+            crate_b = { path = "../crate_b" }
+            crate_c = { path = "../crate_c" }
+            crate_d = { path = "../crate_d" }
+        "#,
+        )
     }
 }
