@@ -11,14 +11,47 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --release
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
     - name: Clippy
-      run: cargo clippy --verbose
+      run: |
+        cargo clippy --all-targets -- \
+        -W clippy::pedantic \
+        -W clippy::nursery \
+        -A clippy::must_use_candidate \
+        -A clippy::non_ascii_literal \
+        -A clippy::cast_sign_loss \
+        -A clippy::cast_possible_wrap \
+        -A clippy::cast_possible_truncation \
+        -A clippy::cast_precision_loss \
+        -A clippy::doc_markdown \
+        -A clippy::module_name_repetitions \
+        -A clippy::shadow_unrelated \
+        -A clippy::maybe_infinite_iter \
+        -A clippy::filter_map \
+        -A clippy::similar_names \
+        -A clippy::missing_const_for_fn \
+        -A clippy::use_self \
+        -A clippy::missing_panics_doc \
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test
+
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run cargo-doc
+      run: cargo doc
