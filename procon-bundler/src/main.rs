@@ -1,5 +1,6 @@
 mod bundle_crate;
 mod config_toml;
+mod find_crate;
 mod fmt;
 mod resolver;
 mod types;
@@ -8,9 +9,14 @@ pub use {
     bundle_crate::bundle_crate,
     clap::{load_yaml, App},
     config_toml::ConfigToml,
+    find_crate::find,
     fmt::format_crate_to_string,
     resolver::{CrateResolver, Resolve},
-    std::{fs::File, io::Read, path::Path},
+    std::{
+        fs::File,
+        io::Read,
+        path::{Path, PathBuf},
+    },
     types::{Crate, Module, Span},
 };
 
@@ -43,10 +49,25 @@ macro_rules! manual_resolver {
 
 fn main() {
     let yaml = clap::load_yaml!("cli.yml");
-    let matches = App::from_yaml(yaml).get_matches();
+    let app = App::from_yaml(yaml);
+    let mut orig_app = app.clone();
+    let matches = app.get_matches();
 
-    let crate_root = Path::new(matches.value_of("CRATE_ROOT").unwrap());
-    let result = bundle_to_string(crate_root);
+    let crate_root = match matches.subcommand() {
+        ("find", Some(matches)) => find(
+            Path::new(matches.value_of("WORKSPACE_ROOT").unwrap()),
+            Path::new(matches.value_of("CRATE_NAME").unwrap()),
+        ),
+        ("bundle", Some(matches)) => PathBuf::from(matches.value_of("CRATE_ROOT").unwrap()),
+        _ => {
+            orig_app
+                .print_help()
+                .expect("ヘルプを印刷できませんでした。");
+            panic!();
+        }
+    };
+
+    let result = bundle_to_string(crate_root.as_path());
     println!("{}", result);
 }
 

@@ -23,6 +23,7 @@ impl Resolve for CrateResolver {
     type B = BufReader<File>;
     // NOTE: mod.rs も探したい場合はここの実装も変えましょう！
     fn resolve(&self, module_path: &Path) -> Self::B {
+        dbg!(&self.root, module_path);
         let mut buf = self.root.clone();
         let is_root = module_path.to_str().unwrap_or_else(|| {
             panic!(
