@@ -1,71 +1,61 @@
-Rust のソースコードをバンドルします。
+# procon-bundler
 
-主な機能はこのあたりでしょうか。詳しくはこの README の下の方をご覧いただけるとです。
-- モジュールのインライン展開
-- テストモジュール、doc commentes の削除
-- 外部クレート（`path` で指定されたもののみ、かつマクロ非対応）の展開
+これは、競技プログラミングのためのバンドルツールです。Rust のクレート全体を、別のクレートのトップレベルモジュールに貼り付けてブロクモジュールとして使えるような文字列に変換します。
 
 
-### 使い方
+## Insallation
 
-このレポジトリのルートを current directory にして、これです。（crates.io に公開しておりません。）
+このレポジトリをクローンして、cargo-install してください。今のところ、crate.io さんに publish する予定はありません。
 
-```bash
-$ cargo install --path .
+```
+> git clone git@github.com:ngtkana/procon-bundler.git
+> cd procon-bundler
+> cargo install --path procon-bundler
 ```
 
-消したいときにはこうです。
+試したいだけならばインストールしなくても使えます。（Usage のセクションをご覧ください。）
 
-```bash
-$ cargo uninstall procon-bundler
+
+## Usage
+
+Installation にあるようにすると、`procon-bundler` コマンドがインストールされます。`bundle`, `find` のサブコマンドがあります。`bundle` はクレートへのファイルパスを指定して、それをバンドルします。`find` は、ワークスペースへのファイルパスとクレート名を指定して、そのクレートをバンドルします。
+
+
+```
+> procon-bundler bundle "${PATH_TO_THE_CRATE_ROOT}"
 ```
 
-使い方は 2 通りあります。一つはこのように、current directory から**クレートルートへのパスを指定します。** これ単体で試したいときにはこちらの方法がおすすめです。
-
-```bash
-$ procon-bundler --path path/to/your/library/crate/root
+```
+> procon-bundler find "${PATH_TO_THE_WORKSPACE_ROOT}" "${CRATE_NAME}"
 ```
 
-もう一つはこのように、current directory から**ワークスペースへのパスと、パッケージのお名前を指定します。** 決まったワークスペースからいろいろなクレートを取ってきたいときにおすすめです。他ツールと連携するときはこちらでしょうか。本ツールの Vim ラッパーである[ac-adapter-rs-vim](https://github.com/ngtkana/ac-adapter-rs-vim) はこちらを呼んでいます。
+インストールしていない場合は、カレントディレクトリをこのレポジトリにしてこれです。
 
-```bash
-$ procon-bundler --repo path/to/your/library/workspace/root name_of_your_package
+```
+> cargo run -- bundle "${PATH_TO_THE_CRATE_ROOT}"
 ```
 
-いずれにしても、**標準出力にバンドル結果が出力されます。**
+```
+> cargo run -- find "${PATH_TO_THE_WORKSPACE_ROOT}" "${CRATE_NAME}"
+```
 
 
-### バンドラさんの仕様
 
-#### バンドラさんのお仕事
+## Effects
 
-まずは `Cargo.toml` を読んで、`dependencies` を把握します。
-
-そしてソースコードを読んで行き、次の一連の操作 X をします。
-
-操作 X:
-- `cfg(test)` アトリビュートのついたインラインモジュールを除去します。
-- インラインでないモジュールはパスを見て中身を見に行き、この一連の操作 X を適用してから**インラインに展開します。**
-
-これが終わったら、
-- `allow(dead_code)` アトリビュートをつけます。
-- Vim 向けのフォールドマーカーをつけます。
-- Doc comments を削除します。
-- 外部クレートを参照するパス（ただしマクロは除く）を書き換えます。
+このレポジトリ直下に、 [procon-bundler-sample](https://github.com/ngtkana/procon-bundler/tree/master/procon-bundler-sample)、[procon-bundler-sample-result](https://github.com/ngtkana/procon-bundler/tree/master/procon-bundler-sample-result)  があるのですが、前者をバンドルすると後者になることがテストで保証されています。
 
 
-#### 非対応の機能 〜 バンドラさんに気持ちよく働いていただくために
+### features
 
-- rust-fmt でフォーマットされていないもの
-- `macro_export`
-- インラインモジュール以外の、`cfg(test)` アイテムの除去
+* モジュールの展開とインデントの調整（インライン、ブロックともに）
+* `cfg(test)` つきモジュールの消去（インライン、ブロックともに）（モジュール以外のアイテムは消去されません。）
+* doc comments の消去（4 種類すべて）
+* パスの置換（マクロ、非マクロともに）
+* フォールドマーカー `{{{`, `}}}` の付加
 
 
-#### ごめんなさい
 
-あまり皆様につかっていただくつもりで作っていなかったのもあり、タブが 4 spaces だったり、Vim のフォールドマーカー（まあでも Vim は世界共通語のようなものではあり……です。）をつけたりなど、好み全開の機能がハードコーディングされています。**もしご要望があれば、多少はカスタマイズできるようにしてもよいかもしれません**ね。
+## Example
 
-意味がわかりやすいように、あたかも構文木に何かをするように書いていますが、実際には正規表現ゴリ押しですから、書いているように動かない可能性もあります。私の書くコードに対しては、もちろんうまく動くのですが、**Hack されると一溜りもない感じなので**お手柔らかにお願いできるとです……
-
-あと、CI はおろかテストさえありませんから、気が向いたらなんとかしたいですね。
-
+私は普段、[ac-adapter-rs](https://github.com/ngtkana/ac-adapter-rs) というライブラリと、[ac-adapter-rs-vim](https://github.com/ngtkana/ac-adapter-rs-vim) というスクリプトを使っています。

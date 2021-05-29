@@ -1,0 +1,26 @@
+name: procon-bundler
+version: "0.2"
+author: Nagata Kana <ngtkana@gmail.com>
+about: Bundles a crate into a depth-1 module.
+subcommands:
+    - bundle:
+        about: bundle a crate
+        args:
+            - CRATE_ROOT:
+                index: 1
+                help: The path to the root of a crate to bundle.
+                takes_value: true
+                required: true
+    - find:
+        about: find and bundle a desired crate in a workspace
+        args:
+            - WORKSPACE_ROOT:
+                index: 1
+                help: The path to the root of a workspace to search.
+                takes_value: true
+                required: true
+            - CRATE_NAME:
+                index: 2
+                help: The name of a crate to bundle. (Either chain-case or snake_case is okay.)
+                takes_value: true
+                required: true

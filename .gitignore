@@ -1,2 +1,3 @@
 Cargo.lock
 /target
+testcase/sample_crate/target
