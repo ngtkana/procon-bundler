@@ -42,8 +42,12 @@ fn f() {
 /// #[cfg(test)] のついたモジュールは消えます。
 #[cfg(test)]
 mod tests {
+    fn factorial(n: u32) -> u32 {
+        (1..=n).product::<u32>()
+    }
+
     #[test]
     fn it_works() {
-        assert_eq!(2 + 2, 4);
+        assert_eq!(factorial(8), 40320);
     }
 }
