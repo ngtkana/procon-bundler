@@ -43,7 +43,7 @@ Installation にあるようにすると、`procon-bundler` コマンドがイ�
 
 ## Effects
 
-このレポジトリ直下に、 [procon-bundler-sample](https://github.com/ngtkana/procon-bundler/tree/master/procon-bundler-sample)、[procon-bundler-sample-result](https://github.com/ngtkana/procon-bundler/tree/master/procon-bundler-sample-result)  があるのですが、前者をバンドルすると後者になることがテストで保証されています。
+このレポジトリ直下に、 [procon-bundler-sample](https://github.com/ngtkana/procon-bundler/tree/master/procon-bundler-sample/src)、[procon-bundler-sample-result](https://github.com/ngtkana/procon-bundler/blob/master/procon-bundler-sample-result/src/lib.rs)  があるのですが、前者をバンドルすると後者になることがテストで保証されています。
 
 
 ### features
