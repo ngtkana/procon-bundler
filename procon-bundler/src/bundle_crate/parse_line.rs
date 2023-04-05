@@ -114,11 +114,9 @@ pub fn substitute_path<'a>(line: &'a str, crate_name: &str, config: &ConfigToml)
         })
         .into_owned()
     }
-    pub fn crate_macros(line: &str, crate_name: &str) -> String {
-        line.replace(
-            "$crate",
-            &format!("$crate::{}", crate_name.replace('-', &"_")),
-        )
+    pub fn crate_macros(line: &str, _crate_name: &str) -> String {
+        // fixed to skip `::module_name`
+        line.to_string()
     }
     pub fn non_macro<'a>(line: &'a str, config: &ConfigToml) -> Cow<'a, str> {
         fn replace(caps: &Captures, config: &ConfigToml) -> String {
