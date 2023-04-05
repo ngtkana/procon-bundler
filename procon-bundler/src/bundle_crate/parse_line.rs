@@ -114,9 +114,18 @@ pub fn substitute_path<'a>(line: &'a str, crate_name: &str, config: &ConfigToml)
         })
         .into_owned()
     }
-    pub fn crate_macros(line: &str, _crate_name: &str) -> String {
-        // fixed to skip `::module_name`
-        line.to_string()
+    pub fn crate_macros(line: &str, crate_name: &str) -> String {
+        lazy_static! {
+            static ref RE: Regex = Regex::new(r#"\$crate(::[A-Za-z][A-Za-z0-9_\-]*)+!"#).unwrap();
+        }
+        if RE.find(line).is_some() {
+            line.to_string()
+        } else {
+            line.replace(
+                "$crate",
+                &format!("$crate::{}", crate_name.replace('-', &"_")),
+            )
+        }
     }
     pub fn non_macro<'a>(line: &'a str, config: &ConfigToml) -> Cow<'a, str> {
         fn replace(caps: &Captures, config: &ConfigToml) -> String {
@@ -212,7 +221,8 @@ mod tests {
         substitute_path(line, "my_crate", &build_sample_config_toml())
     }
 
-    #[test_case("$crate::a" => "$crate::my_crate::a".to_owned(); "simple $crate")]
+    #[test_case("$crate::a" => "$crate::my_crate::a".to_owned(); "simple macro with $crate")]
+    #[test_case("$crate::a!" => "$crate::a!".to_owned(); "simple item with $crate")]
     #[test_case("crate::a" => "crate::a".to_owned(); "not `$crate` but just `crate`")]
     fn test_substitute_macro_path(line: &str) -> String {
         substitute_path(line, "my_crate", &build_sample_config_toml())

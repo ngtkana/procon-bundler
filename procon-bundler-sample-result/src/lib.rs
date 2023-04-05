@@ -8,6 +8,9 @@ mod procon_bundler_sample {
                 #[allow(unused_imports)]
                 use $crate::procon_bundler_sample::A;
             };
+            (@another) => {
+                $crate::my_macro2!();
+            };
         }
         #[allow(dead_code)]
         enum B {}

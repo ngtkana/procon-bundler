@@ -9,6 +9,9 @@ macro_rules! my_macro2 {
         #[allow(unused_imports)]
         use $crate::A;
     };
+    (@another) => {
+        $crate::my_macro2!();
+    };
 }
 
 #[allow(dead_code)]
