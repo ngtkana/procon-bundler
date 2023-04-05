@@ -42,11 +42,7 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
         }
     }
     fn bundle_module(&mut self, reader: impl BufRead, mut current_module_path: PathBuf) -> Module {
-        fn push_line_to_stack<'a, R>(
-            me: &CrateBundler<'a, R>,
-            stack: &mut Vec<Module>,
-            line: &str,
-        ) {
+        fn push_line_to_stack<R>(me: &CrateBundler<R>, stack: &mut Vec<Module>, line: &str) {
             let stack_len = stack.len();
             let spans = &mut stack.last_mut().unwrap().spans;
             if !matches!(spans.last(), Some(Span::Lines(_))) {
@@ -152,7 +148,7 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
                     unresolved_cfg_test = Some(UnresolvedCfgTest::Unknown(line.to_owned()));
                 } else if parse_block_doc_comments_start(&line) {
                     // Case 6: ブロック doc comments の開始
-                    assert_eq!(in_doc_comments, false);
+                    assert!(!in_doc_comments);
                     in_doc_comments = true;
                 } else if parse_oneline_doc_comments(&line) || line.is_empty() {
                     // Case 7: oneline doc comments or 空行

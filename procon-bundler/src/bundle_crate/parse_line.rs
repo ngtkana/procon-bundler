@@ -104,7 +104,7 @@ pub fn remove_indentation(line: &str, indent_level: usize) -> String {
 }
 
 // パスの置換をします。
-pub fn substitute_path<'a>(line: &'a str, crate_name: &str, config: &ConfigToml) -> String {
+pub fn substitute_path(line: &str, crate_name: &str, config: &ConfigToml) -> String {
     pub fn crates(line: &str, crate_name: &str) -> String {
         lazy_static! {
             static ref RE: Regex = Regex::new(r#"([^\$])crate::"#).unwrap();
