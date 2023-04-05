@@ -2,12 +2,11 @@ use {
     crate::{Crate, Module, Span, TAB, TAB_LENGTH},
     std::{
         fmt::{Display, Formatter, Result, Write},
-        iter::repeat,
     },
 };
 
-static FOLD_MAKER_OPEN: &'static str = concat!("{", "{", "{");
-static FOLD_MAKER_CLOSE: &'static str = concat!("}", "}", "}");
+static FOLD_MAKER_OPEN: &str = concat!("{", "{", "{");
+static FOLD_MAKER_CLOSE: &str = concat!("}", "}", "}");
 
 pub fn format_crate_to_string(my_crate: Crate) -> String {
     format!("{}", CrateFormatter(&my_crate))
@@ -46,9 +45,7 @@ pub fn fmt_dfs(
                 .to_owned()
         })
         .unwrap_or_else(|| crate_name.replace('-', "_"));
-    let indent = repeat(' ')
-        .take(indent_level * TAB_LENGTH)
-        .collect::<String>();
+    let indent = " ".repeat(indent_level * TAB_LENGTH);
     writeln!(w, "{}mod {} {{", &indent, &name)?;
     for span in &module.spans {
         match span {

@@ -43,7 +43,7 @@ impl ConfigToml {
             {
                 Value::Table(table) => table
                     .get("dependencies")
-                    .map(|deps| from_deps(deps))
+                    .map(from_deps)
                     .unwrap_or_else(Default::default),
                 _ => panic!("TOML ファイルが Table ではありませんでした。"),
             },

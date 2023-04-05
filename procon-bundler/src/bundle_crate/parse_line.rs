@@ -123,7 +123,7 @@ pub fn substitute_path<'a>(line: &'a str, crate_name: &str, config: &ConfigToml)
         } else {
             line.replace(
                 "$crate",
-                &format!("$crate::{}", crate_name.replace('-', &"_")),
+                &format!("$crate::{}", crate_name.replace('-', "_")),
             )
         }
     }

@@ -25,7 +25,7 @@ impl WorkspaceCargoToml {
                     .unwrap_or_else(|| {
                         panic!("ワークスペースの Cargo.toml の `workspace` の `members` が配列ではありません。")
                     })
-                    .into_iter()
+                    .iter()
                     .map(|value| value.as_str()
                         .unwrap_or_else(|| {
                             panic!("ワークスペースの Cargo.toml の `workspace` の `members` の要素が文字列ではありません。")

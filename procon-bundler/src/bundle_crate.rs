@@ -55,7 +55,7 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
             match spans.last_mut().unwrap() {
                 Span::Lines(ref mut lines) => {
                     lines.push(remove_indentation(
-                        substitute_path(&line, &me.crate_name, &me.config_toml).as_ref(),
+                        substitute_path(line, me.crate_name, &me.config_toml).as_ref(),
                         stack_len - 1,
                     ));
                 }
@@ -145,7 +145,7 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
                 // モジュールではなかったので、遅ればせながらプッシュします。
                 if let Some(UnresolvedCfgTest::Unknown(cfg_test)) = unresolved_cfg_test {
                     unresolved_cfg_test = Some(UnresolvedCfgTest::Module);
-                    push_line_to_stack(&self, &mut stack, &cfg_test);
+                    push_line_to_stack(self, &mut stack, &cfg_test);
                 }
                 if parse_cfg_test(&line) {
                     // Case 5: #[cfg(test)]

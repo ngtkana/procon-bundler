@@ -104,7 +104,7 @@ mod tests {
         let result = bundle_to_string(Path::new("../procon-bundler-sample"));
         let expected = include_str!("../../procon-bundler-sample-result/src/lib.rs");
         let result = result.as_ref();
-        let expected = expected.as_ref();
+        let expected = expected;
         assert_diff!(result, expected, "\n", 0);
     }
 }
