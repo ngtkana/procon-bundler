@@ -116,7 +116,7 @@ pub fn substitute_path(line: &str, crate_name: &str, config: &ConfigToml) -> Str
     }
     pub fn crate_macros(line: &str, crate_name: &str) -> String {
         lazy_static! {
-            static ref RE: Regex = Regex::new(r#"\$crate(::[A-Za-z][A-Za-z0-9_\-]*)+!"#).unwrap();
+            static ref RE: Regex = Regex::new(r#"\$crate(::[A-Za-z_][A-Za-z0-9_\-]*)+!"#).unwrap();
         }
         if RE.find(line).is_some() {
             line.to_string()
