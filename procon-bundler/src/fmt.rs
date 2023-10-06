@@ -1,8 +1,6 @@
 use {
     crate::{Crate, Module, Span, TAB, TAB_LENGTH},
-    std::{
-        fmt::{Display, Formatter, Result, Write},
-    },
+    std::fmt::{Display, Formatter, Result, Write},
 };
 
 static FOLD_MAKER_OPEN: &str = concat!("{", "{", "{");
@@ -24,7 +22,7 @@ impl Display for CrateFormatter<'_> {
         )?;
         writeln!(f, "#[allow(dead_code)]")?;
         fmt_dfs(f, &self.0.name, &self.0.root, 0)?;
-        writeln!(f, "// {}", FOLD_MAKER_CLOSE)?;
+        write!(f, "// {}", FOLD_MAKER_CLOSE)?;
         Ok(())
     }
 }
