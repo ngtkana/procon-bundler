@@ -1,4 +1,6 @@
 // procon_bundler_sample {{{
+// https://ngtkana.github.io/ac-adapter-rs/procon_bundler_sample/index.html
+
 #[allow(dead_code)]
 mod procon_bundler_sample {
     mod a {

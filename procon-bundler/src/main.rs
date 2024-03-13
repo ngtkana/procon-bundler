@@ -1,7 +1,7 @@
 mod bundle_crate;
 mod config_toml;
-mod fmt;
 mod parse_line;
+mod prettify;
 mod resolver;
 mod types;
 
@@ -9,7 +9,7 @@ pub use {
     bundle_crate::bundle_crate,
     clap::{load_yaml, App},
     config_toml::ConfigToml,
-    fmt::format_crate_to_string,
+    prettify::format_crate_to_string,
     resolver::{CrateResolver, Resolve},
     std::{
         fs::File,

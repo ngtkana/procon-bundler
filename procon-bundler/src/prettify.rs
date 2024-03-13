@@ -3,8 +3,8 @@ use {
     std::fmt::{Display, Formatter, Result, Write},
 };
 
-static FOLD_MAKER_OPEN: &str = concat!("{", "{", "{");
-static FOLD_MAKER_CLOSE: &str = concat!("}", "}", "}");
+const OPEN: &str = "{";
+const CLOSE: &str = "}";
 
 pub fn format_crate_to_string(my_crate: Crate) -> String {
     format!("{}", CrateFormatter(&my_crate))
@@ -14,15 +14,16 @@ struct CrateFormatter<'a>(&'a Crate);
 
 impl Display for CrateFormatter<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let undered = self.0.name.replace('-', "_");
+        writeln!(f, "// {undered} {OPEN}{OPEN}{OPEN}")?;
         writeln!(
             f,
-            "// {} {}",
-            self.0.name.replace('-', "_"),
-            FOLD_MAKER_OPEN,
+            "// https://ngtkana.github.io/ac-adapter-rs/{undered}/index.html",
         )?;
+        writeln!(f)?; // to avoid the buggy behavior of rustfmt
         writeln!(f, "#[allow(dead_code)]")?;
         fmt_dfs(f, &self.0.name, &self.0.root, 0)?;
-        write!(f, "// {}", FOLD_MAKER_CLOSE)?;
+        write!(f, "// {CLOSE}{CLOSE}{CLOSE}")?;
         Ok(())
     }
 }
@@ -66,7 +67,6 @@ pub fn fmt_dfs(
 #[cfg(test)]
 mod tests {
     use crate::format_crate_to_string;
-
     use {
         super::{Crate, Module, Span},
         std::path::PathBuf,
@@ -89,7 +89,9 @@ mod tests {
         };
         let result = format_crate_to_string(w);
         let expected = concat!(
-            concat!("// holy_crate ", "{", "{", "{", "\n"),
+            concat!("// holy_crate {", "{{\n"),
+            "// https://ngtkana.github.io/ac-adapter-rs/holy_crate/index.html\n",
+            "\n",
             "#[allow(dead_code)]\n",
             "mod holy_crate {\n",
             "    1\n",
@@ -97,7 +99,7 @@ mod tests {
             "    3\n",
             "    4\n",
             "}\n",
-            concat!("// ", "}", "}", "}"),
+            concat!("// }", "}}"),
         );
         assert_eq!(result, expected);
     }
@@ -130,7 +132,9 @@ mod tests {
         };
         let result = format_crate_to_string(w);
         let expected = concat!(
-            concat!("// holy_crate ", "{", "{", "{", "\n"),
+            concat!("// holy_crate {", "{{\n"),
+            "// https://ngtkana.github.io/ac-adapter-rs/holy_crate/index.html\n",
+            "\n",
             "#[allow(dead_code)]\n",
             "mod holy_crate {\n",
             "    start root\n",
@@ -143,7 +147,7 @@ mod tests {
             "    }\n",
             "    end root\n",
             "}\n",
-            concat!("// ", "}", "}", "}"),
+            concat!("// }", "}}"),
         );
         assert_eq!(result, expected);
     }
