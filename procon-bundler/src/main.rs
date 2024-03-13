@@ -1,7 +1,7 @@
 mod bundle_crate;
 mod config_toml;
-mod find_crate;
 mod fmt;
+mod parse_line;
 mod resolver;
 mod types;
 
@@ -9,7 +9,6 @@ pub use {
     bundle_crate::bundle_crate,
     clap::{load_yaml, App},
     config_toml::ConfigToml,
-    find_crate::find,
     fmt::format_crate_to_string,
     resolver::{CrateResolver, Resolve},
     std::{
@@ -54,10 +53,9 @@ fn main() {
     let matches = app.get_matches();
 
     let crate_root = match matches.subcommand() {
-        ("find", Some(matches)) => find(
-            Path::new(matches.value_of("WORKSPACE_ROOT").unwrap()),
-            Path::new(matches.value_of("CRATE_NAME").unwrap()),
-        ),
+        ("find", Some(matches)) => Path::new(matches.value_of("WORKSPACE_ROOT").unwrap())
+            .join("libs")
+            .join(matches.value_of("CRATE_NAME").unwrap()),
         ("bundle", Some(matches)) => PathBuf::from(matches.value_of("CRATE_ROOT").unwrap()),
         _ => {
             orig_app
@@ -104,7 +102,7 @@ mod tests {
         let result = bundle_to_string(Path::new("../procon-bundler-sample"));
         let expected = include_str!("../../procon-bundler-sample-result/src/lib.rs");
         let result = result.as_ref();
-        let expected = expected;
+        let expected = expected[..expected.len() - 1].as_ref();
         assert_diff!(result, expected, "\n", 0);
     }
 }

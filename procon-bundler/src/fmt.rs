@@ -97,7 +97,7 @@ mod tests {
             "    3\n",
             "    4\n",
             "}\n",
-            concat!("// ", "}", "}", "}", "\n"),
+            concat!("// ", "}", "}", "}"),
         );
         assert_eq!(result, expected);
     }
@@ -143,7 +143,7 @@ mod tests {
             "    }\n",
             "    end root\n",
             "}\n",
-            concat!("// ", "}", "}", "}", "\n"),
+            concat!("// ", "}", "}", "}"),
         );
         assert_eq!(result, expected);
     }

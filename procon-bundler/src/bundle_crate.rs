@@ -1,6 +1,5 @@
+use crate::parse_line;
 use std::mem::take;
-
-mod parse_line;
 
 use {
     crate::{ConfigToml, Crate, Module, Resolve, Span, TAB_LENGTH},
@@ -42,7 +41,7 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
         }
     }
     fn bundle_module(&mut self, reader: impl BufRead, mut current_module_path: PathBuf) -> Module {
-        fn push_line_to_stack<R>(me: &CrateBundler<R>, stack: &mut Vec<Module>, line: &str) {
+        fn push_line_to_stack<R>(me: &CrateBundler<R>, stack: &mut [Module], line: &str) {
             let stack_len = stack.len();
             let spans = &mut stack.last_mut().unwrap().spans;
             if !matches!(spans.last(), Some(Span::Lines(_))) {
