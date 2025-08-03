@@ -1,12 +1,15 @@
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-    path::{Path, PathBuf},
+use {
+    crate::{BundlerError, Result},
+    std::{
+        fs::File,
+        io::{BufRead, BufReader},
+        path::{Path, PathBuf},
+    },
 };
 
 pub trait Resolve {
     type B: BufRead;
-    fn resolve(&self, module_path: &Path) -> Self::B;
+    fn resolve(&self, module_path: &Path) -> Result<Self::B>;
 }
 
 pub struct CrateResolver {
@@ -22,14 +25,14 @@ impl CrateResolver {
 impl Resolve for CrateResolver {
     type B = BufReader<File>;
     // NOTE: mod.rs も探したい場合はここの実装も変えましょう！
-    fn resolve(&self, module_path: &Path) -> Self::B {
+    fn resolve(&self, module_path: &Path) -> Result<Self::B> {
         let mut buf = self.root.clone();
-        let is_root = module_path.to_str().unwrap_or_else(|| {
-            panic!(
-                "OsStr -> str の変換ができません。module_path = {:?}",
-                module_path
-            )
-        }) == ".";
+        let is_root = module_path
+            .to_str()
+            .ok_or_else(|| BundlerError::InvalidPathConversion {
+                path: module_path.to_path_buf(),
+            })?
+            == ".";
         buf.push("src");
         buf.push(if is_root {
             Path::new("lib")
@@ -37,15 +40,14 @@ impl Resolve for CrateResolver {
             module_path
         });
         buf.set_extension("rs");
-        BufReader::new(File::open(&buf).unwrap_or_else(|e| {
-            panic!(
-                concat!(
-                    "モジュールパスからファイルへの解決に失敗しました。",
-                    "module_path = {:?}, path = {:?}, e = {:?}",
-                ),
-                module_path, &buf, e
-            )
-        }))
+        
+        let file = File::open(&buf).map_err(|e| BundlerError::ModuleFileNotFound {
+            module_path: module_path.to_path_buf(),
+            file_path: buf,
+            source: e,
+        })?;
+        
+        Ok(BufReader::new(file))
     }
 }
 
@@ -73,12 +75,14 @@ mod tests {
         let mut s = String::new();
         resolver
             .resolve(Path::new("a"))
+            .unwrap()
             .read_to_string(&mut s)
             .unwrap();
         assert_eq!(s.as_str(), "content of a");
         s.clear();
         resolver
             .resolve(Path::new("b"))
+            .unwrap()
             .read_to_string(&mut s)
             .unwrap();
         assert_eq!(s.as_str(), "content of b");
@@ -91,6 +95,7 @@ mod tests {
         let crate_resolver = CrateResolver::new(PathBuf::from("../procon-bundler-sample"));
         crate_resolver
             .resolve(Path::new("small_module"))
+            .unwrap()
             .read_to_string(&mut s)
             .unwrap();
         assert_eq!(

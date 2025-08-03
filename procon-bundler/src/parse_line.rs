@@ -1,14 +1,14 @@
 use {
     crate::{ConfigToml, TAB_LENGTH},
-    lazy_static::lazy_static,
     regex::Captures,
     regex::Regex,
-    std::borrow::Cow,
+    std::{borrow::Cow, sync::OnceLock},
 };
 
 pub fn parse_module_decl(line: &str) -> Option<String> {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(concat!(
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        Regex::new(concat!(
             "^",
             r#"\s*"#,                                // spaces
             r#"((pub|pub\s*\([^\)]+\))\s+)?"#,       // vis
@@ -19,15 +19,16 @@ pub fn parse_module_decl(line: &str) -> Option<String> {
             ";",                                     // semi
             r#"\s*$"#,                               // spaces
         ))
-        .unwrap();
-    }
-    RE.captures(line)
+        .unwrap()
+    });
+    re.captures(line)
         .map(|captures| captures.name("name").unwrap().as_str().to_owned())
 }
 
 pub fn parse_module_block_begin(line: &str) -> Option<String> {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(concat!(
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        Regex::new(concat!(
             "^",
             r#"\s*"#,                                // spaces
             r#"((pub|pub\s*\([^\)]+\))\s+)?"#,       // vis
@@ -38,27 +39,25 @@ pub fn parse_module_block_begin(line: &str) -> Option<String> {
             r#"\{"#,                                 // opening brace
             r#"\s*$"#,                               // spaces
         ))
-        .unwrap();
-    }
-    RE.captures(line)
+        .unwrap()
+    });
+    re.captures(line)
         .map(|captures| captures.name("name").unwrap().as_str().to_owned())
 }
 
 // Leading spaces の個数を返します。
 pub fn parse_block_end(line: &str) -> Option<usize> {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r#"^(?P<leading>\s*)\}\s*$"#).unwrap();
-    }
-    RE.captures(line)
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r#"^(?P<leading>\s*)\}\s*$"#).unwrap());
+    re.captures(line)
         .map(|captures| captures.name("leading").unwrap().as_str().len())
 }
 
 // #[cfg(test)] であるかどうかを判定します。
 pub fn parse_cfg_test(line: &str) -> bool {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(r#"^\s*#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*"#).unwrap();
-    }
-    RE.is_match(line)
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r#"^\s*#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*"#).unwrap());
+    re.is_match(line)
 }
 
 // oneline doc_comments であるかを判定します。
@@ -106,19 +105,17 @@ pub fn remove_indentation(line: &str, indent_level: usize) -> String {
 // パスの置換をします。
 pub fn substitute_path(line: &str, crate_name: &str, config: &ConfigToml) -> String {
     pub fn crates(line: &str, crate_name: &str) -> String {
-        lazy_static! {
-            static ref RE: Regex = Regex::new(r#"([^\$])crate::"#).unwrap();
-        }
-        RE.replace_all(line, |caps: &Captures| {
+        static RE: OnceLock<Regex> = OnceLock::new();
+        let re = RE.get_or_init(|| Regex::new(r#"([^\$])crate::"#).unwrap());
+        re.replace_all(line, |caps: &Captures| {
             format!("{}crate::{}::", &caps[1], crate_name.replace('-', "_"))
         })
         .into_owned()
     }
     pub fn crate_macros(line: &str, crate_name: &str) -> String {
-        lazy_static! {
-            static ref RE: Regex = Regex::new(r#"\$crate(::[A-Za-z_][A-Za-z0-9_\-]*)+!"#).unwrap();
-        }
-        if RE.find(line).is_some() {
+        static RE: OnceLock<Regex> = OnceLock::new();
+        let re = RE.get_or_init(|| Regex::new(r#"\$crate(::[A-Za-z_][A-Za-z0-9_\-]*)+!"#).unwrap());
+        if re.find(line).is_some() {
             line.to_string()
         } else {
             line.replace(
@@ -136,11 +133,9 @@ pub fn substitute_path(line: &str, crate_name: &str, config: &ConfigToml) -> Str
                 format!("{}::", name)
             }
         }
-        lazy_static! {
-            static ref RE: Regex =
-                Regex::new(r#"(?P<name>[A-Za-z_][A-Za-z0-9_\-]*)(\u{3A}){2}"#).unwrap();
-        }
-        RE.replace_all(line, |caps: &Captures| replace(caps, config))
+        static RE: OnceLock<Regex> = OnceLock::new();
+        let re = RE.get_or_init(|| Regex::new(r#"(?P<name>[A-Za-z_][A-Za-z0-9_\-]*)(\u{3A}){2}"#).unwrap());
+        re.replace_all(line, |caps: &Captures| replace(caps, config))
     }
     let line = crates(line, crate_name);
     let line = crate_macros(&line, crate_name);
@@ -237,6 +232,6 @@ mod tests {
             crate_c = { path = "../crate_c" }
             crate_d = { path = "../crate_d" }
         "#,
-        )
+        ).unwrap()
     }
 }

@@ -1,4 +1,5 @@
 use {
+    crate::{BundlerError, Result},
     std::{collections::HashMap, path::PathBuf},
     toml::{from_str, Value},
 };
@@ -9,45 +10,58 @@ pub struct ConfigToml {
 }
 
 impl ConfigToml {
-    pub fn new(file_content: &str) -> Self {
+    pub fn new(file_content: &str) -> Result<Self> {
         // dependency の行の一つの、`=` よりも右側をパースします。
-        fn from_resource(resource: &Value) -> Option<PathBuf> {
+        fn from_resource(resource: &Value) -> Result<Option<PathBuf>> {
             match resource {
-                Value::Table(resource) => resource.get("path").map(|path| {
-                    PathBuf::from(
-                        path.as_str()
-                            .unwrap_or_else(|| {
-                                panic!("path の値が string ではありません。path = {:?}", path)
-                            })
-                            .to_string(),
-                    )
-                }),
-                _ => None,
+                Value::Table(resource) => {
+                    if let Some(path) = resource.get("path") {
+                        let path_str = path.as_str().ok_or_else(|| {
+                            BundlerError::PathNotString {
+                                value: format!("{:?}", path),
+                            }
+                        })?;
+                        Ok(Some(PathBuf::from(path_str)))
+                    } else {
+                        Ok(None)
+                    }
+                }
+                _ => Ok(None),
             }
         }
+        
         // [dependencies] セクションをパースします。
-        fn from_deps(deps: &Value) -> HashMap<String, PathBuf> {
+        fn from_deps(deps: &Value) -> Result<HashMap<String, PathBuf>> {
             match deps {
-                Value::Table(deps) => deps
-                    .iter()
-                    .flat_map(|(name, dep)| {
-                        from_resource(dep).map(|pathbuf| (name.to_string(), pathbuf))
-                    })
-                    .collect::<HashMap<_, _>>(),
-                _ => panic!("dependencies が Table ではありませんでした。"),
+                Value::Table(deps) => {
+                    let mut result = HashMap::new();
+                    for (name, dep) in deps {
+                        if let Some(pathbuf) = from_resource(dep)? {
+                            result.insert(name.to_string(), pathbuf);
+                        }
+                    }
+                    Ok(result)
+                }
+                _ => Err(BundlerError::DependenciesNotTable),
             }
         }
+        
         // ファイル全体をパースします。
-        Self {
-            deps: match from_str::<Value>(file_content).expect("TOML をパースできませんでした。")
-            {
-                Value::Table(table) => table
-                    .get("dependencies")
-                    .map(from_deps)
-                    .unwrap_or_else(Default::default),
-                _ => panic!("TOML ファイルが Table ではありませんでした。"),
-            },
-        }
+        let value = from_str::<Value>(file_content)
+            .map_err(|e| BundlerError::CargoTomlParseError { source: e })?;
+            
+        let deps = match value {
+            Value::Table(ref table) => {
+                if let Some(dependencies) = table.get("dependencies") {
+                    from_deps(dependencies)?
+                } else {
+                    HashMap::new()
+                }
+            }
+            _ => return Err(BundlerError::TomlNotTable),
+        };
+        
+        Ok(Self { deps })
     }
 }
 
@@ -67,7 +81,7 @@ mod tests {
             b = { path = "../path/to/b"}
             c = { path = "../path/to/c"}
         "#,
-        );
+        ).unwrap();
         let mut expected = HashMap::new();
         expected.insert("a".to_string(), PathBuf::from("../path/to/a"));
         expected.insert("b".to_string(), PathBuf::from("../path/to/b"));
@@ -86,7 +100,7 @@ mod tests {
             dbg = { git = "https://github.com/ngtkana/ac-adapter-rs.git", optional = true }
             c = { path = "../path/to/c"}
         "#,
-        );
+        ).unwrap();
         let mut expected = HashMap::new();
         expected.insert("a".to_string(), PathBuf::from("../path/to/a"));
         expected.insert("b".to_string(), PathBuf::from("../path/to/b"));
@@ -105,7 +119,7 @@ mod tests {
             b = { path = "../path/to/b"}
             c = { path = "../path/to/c"}
         "#,
-        );
+        ).unwrap();
         let mut expected = HashMap::new();
         expected.insert("a".to_string(), PathBuf::from("../path/to/a"));
         assert_eq!(config.deps, expected);
@@ -138,7 +152,7 @@ mod tests {
             hamcrest2 = "0.3.0"
             test-case = { version = "1", features = ["hamcrest_assertions"] }
         "#,
-        );
+        ).unwrap();
         let mut expected = HashMap::new();
         expected.insert("here".to_string(), PathBuf::from("../here"));
         expected.insert("there".to_string(), PathBuf::from("../there"));

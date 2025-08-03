@@ -2,7 +2,7 @@ use crate::parse_line;
 use std::mem::take;
 
 use {
-    crate::{ConfigToml, Crate, Module, Resolve, Span, TAB_LENGTH},
+    crate::{ConfigToml, Crate, Module, Resolve, Result, Span, TAB_LENGTH},
     parse_line::{
         parse_block_doc_comments_end, parse_block_doc_comments_start, parse_block_end,
         parse_cfg_test, parse_module_block_begin, parse_module_decl, parse_oneline_doc_comments,
@@ -14,7 +14,7 @@ use {
     },
 };
 
-pub fn bundle_crate<R: Resolve>(crate_name: &str, resolver: R, config_toml: ConfigToml) -> Crate {
+pub fn bundle_crate<R: Resolve>(crate_name: &str, resolver: R, config_toml: ConfigToml) -> Result<Crate> {
     CrateBundler::new(crate_name, resolver, config_toml).bundle_crate()
 }
 
@@ -33,14 +33,14 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
             config_toml,
         }
     }
-    fn bundle_crate(&mut self) -> Crate {
-        let reader = self.resolver.resolve(Path::new("."));
-        Crate {
+    fn bundle_crate(&mut self) -> Result<Crate> {
+        let reader = self.resolver.resolve(Path::new("."))?;
+        Ok(Crate {
             name: self.crate_name.to_owned(),
-            root: self.bundle_module(reader, PathBuf::from(".")),
-        }
+            root: self.bundle_module(reader, PathBuf::from("."))?,
+        })
     }
-    fn bundle_module(&mut self, reader: impl BufRead, mut current_module_path: PathBuf) -> Module {
+    fn bundle_module(&mut self, reader: impl BufRead, mut current_module_path: PathBuf) -> Result<Module> {
         fn push_line_to_stack<R>(me: &CrateBundler<R>, stack: &mut [Module], line: &str) {
             let stack_len = stack.len();
             let spans = &mut stack.last_mut().unwrap().spans;
@@ -96,10 +96,8 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
                 // * テストフラグが立っていればモジュールに反映
                 //
                 current_module_path.push(name);
-                let mut module = self.bundle_module(
-                    self.resolver.resolve(&current_module_path),
-                    current_module_path.clone(),
-                );
+                let reader = self.resolver.resolve(&current_module_path)?;
+                let mut module = self.bundle_module(reader, current_module_path.clone())?;
                 module.is_test = take(&mut unresolved_cfg_test).is_some();
                 stack
                     .last_mut()
@@ -165,7 +163,7 @@ impl<'a, R: Resolve> CrateBundler<'a, R> {
         }
         let res = stack.pop().unwrap();
         assert!(stack.is_empty());
-        res
+        Ok(res)
     }
 }
 
@@ -193,7 +191,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new("").unwrap()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -235,7 +233,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new("").unwrap()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -271,7 +269,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new("").unwrap()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -310,7 +308,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new("").unwrap()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -348,7 +346,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new("").unwrap()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -388,7 +386,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new("").unwrap()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -438,7 +436,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new("").unwrap()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -515,7 +513,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new("").unwrap()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -590,7 +588,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new("").unwrap()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -660,7 +658,7 @@ mod tests {
                 "./a/b/c/d/g" => "in g",
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new(""));
+        let result = bundle_crate("my_crate", ManualResolver {}, ConfigToml::new("").unwrap()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -727,7 +725,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, build_sample_config_toml());
+        let result = bundle_crate("my_crate", ManualResolver {}, build_sample_config_toml()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -750,7 +748,7 @@ mod tests {
                 ),
             }
         }
-        let result = bundle_crate("my_crate", ManualResolver {}, build_sample_config_toml());
+        let result = bundle_crate("my_crate", ManualResolver {}, build_sample_config_toml()).unwrap();
         let expected = Crate {
             name: "my_crate".to_owned(),
             root: Module {
@@ -775,6 +773,6 @@ mod tests {
             crate_c = { path = "../crate_c" }
             crate_d = { path = "../crate_d" }
         "#,
-        )
+        ).unwrap()
     }
 }
