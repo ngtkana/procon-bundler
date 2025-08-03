@@ -20,7 +20,7 @@ impl Display for CrateFormatter<'_> {
             f,
             "// https://ngtkana.github.io/ac-adapter-rs/{undered}/index.html",
         )?;
-        writeln!(f)?; // to avoid the buggy behavior of rustfmt
+        writeln!(f, "#[allow(unused_imports)]")?;
         writeln!(f, "#[allow(dead_code)]")?;
         fmt_dfs(f, &self.0.name, &self.0.root, 0)?;
         write!(f, "// {CLOSE}{CLOSE}{CLOSE}")?;
@@ -91,7 +91,7 @@ mod tests {
         let expected = concat!(
             concat!("// holy_crate {", "{{\n"),
             "// https://ngtkana.github.io/ac-adapter-rs/holy_crate/index.html\n",
-            "\n",
+            "#[allow(unused_imports)]\n",
             "#[allow(dead_code)]\n",
             "mod holy_crate {\n",
             "    1\n",
@@ -134,7 +134,7 @@ mod tests {
         let expected = concat!(
             concat!("// holy_crate {", "{{\n"),
             "// https://ngtkana.github.io/ac-adapter-rs/holy_crate/index.html\n",
-            "\n",
+            "#[allow(unused_imports)]\n",
             "#[allow(dead_code)]\n",
             "mod holy_crate {\n",
             "    start root\n",
