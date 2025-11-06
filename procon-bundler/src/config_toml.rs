@@ -37,7 +37,8 @@ impl ConfigToml {
                     let mut result = HashMap::new();
                     for (name, dep) in deps {
                         if let Some(pathbuf) = from_resource(dep)? {
-                            result.insert(name.to_string(), pathbuf);
+                            // ハイフンつなぎをアンダースコアつなぎに変換
+                            result.insert(name.replace('-', "_"), pathbuf);
                         }
                     }
                     Ok(result)
@@ -86,6 +87,19 @@ mod tests {
         expected.insert("a".to_string(), PathBuf::from("../path/to/a"));
         expected.insert("b".to_string(), PathBuf::from("../path/to/b"));
         expected.insert("c".to_string(), PathBuf::from("../path/to/c"));
+        assert_eq!(config.deps, expected);
+    }
+
+    #[test]
+    fn test_hyphenated() {
+        let config = ConfigToml::new(
+            r#"
+            [dependencies]
+            a-b = { path = "../path/to/a-b"}
+        "#,
+        ).unwrap();
+        let mut expected = HashMap::new();
+        expected.insert("a_b".to_string(), PathBuf::from("../path/to/a-b"));
         assert_eq!(config.deps, expected);
     }
 
